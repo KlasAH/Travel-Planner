@@ -5,7 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { Trip, TripItem, ItemType, SharedTripData } from '../types';
 import { Layout, Button, Card, CategoryIcon, Input, Fab, DateInput, TimeInput } from '../components/Shared';
-import { Plus, Trash2, Calendar, MapPin, Clock, DollarSign, Check, Wand2, Tag, AlignLeft, Hash, Plane, Key, Home, Car, X, Link as LinkIcon, ExternalLink, ArrowRight, Globe, ChevronRight, Share2 } from 'lucide-react';
+import { Plus, Trash2, Calendar, MapPin, Clock, DollarSign, Check, Wand2, Tag, AlignLeft, Hash, Plane, Key, Home, Car, X, Link as LinkIcon, ExternalLink, ArrowRight, Globe, ChevronRight, Share2, Copy, ImageIcon, AlertTriangle, Upload } from 'lucide-react';
 import { generateItinerary, Suggestion } from '../services/geminiService';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import { Tooltip } from "react-tooltip";
@@ -30,6 +30,7 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity' 
   const [formData, setFormData] = useState<Partial<TripItem>>({
     type: initialType,
     date: date || new Date().toISOString().split('T')[0],
+    endDate: date || new Date().toISOString().split('T')[0], // Default end date same as start
     title: '',
     details: '',
     location: '',
@@ -37,6 +38,7 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity' 
     bookingRef: '',
     bookingLink: '',
     cost: undefined,
+    imageUrl: '',
   });
 
   // State for multiple flight segments
@@ -44,18 +46,64 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity' 
 
   useEffect(() => {
     if (isOpen) {
+        const d = date || new Date().toISOString().split('T')[0];
         setFormData(prev => ({ 
           ...prev, 
           type: initialType,
-          date: date || new Date().toISOString().split('T')[0],
+          date: d,
+          endDate: d,
           // Reset specific fields when opening
           title: '', details: '', location: '', bookingRef: '', bookingLink: '',
-          departureAirport: '', arrivalAirport: '', pickupLocation: '', dropoffLocation: '', endDate: '',
-          cost: undefined
+          departureAirport: '', arrivalAirport: '', pickupLocation: '', dropoffLocation: '',
+          cost: undefined,
+          imageUrl: ''
         }));
         setFlightSegments([]);
     }
   }, [isOpen, date, initialType]);
+
+  const handleStartDateChange = (val: string) => {
+    // Automatically set end date to the same day when start date changes
+    setFormData(prev => ({
+        ...prev,
+        date: val,
+        endDate: val 
+    }));
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      // Create an image element to resize it (prevent huge files in IndexedDB)
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const MAX_WIDTH = 800; // Resize to max 800px width
+        const scaleSize = MAX_WIDTH / img.width;
+        
+        // Calculate new dimensions
+        if (img.width > MAX_WIDTH) {
+            canvas.width = MAX_WIDTH;
+            canvas.height = img.height * scaleSize;
+        } else {
+            canvas.width = img.width;
+            canvas.height = img.height;
+        }
+
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7); // 70% quality JPEG
+        setFormData(prev => ({ ...prev, imageUrl: dataUrl }));
+      };
+      if (event.target?.result) {
+          img.src = event.target.result as string;
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleAddFlightSegment = () => {
       if (!formData.date) return;
@@ -79,7 +127,7 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity' 
           arrivalAirport: '',
           // Auto-fill next date with previous arrival date
           date: prev.endDate || prev.date,
-          endDate: '', // Clear arrival date for new segment
+          endDate: prev.endDate || prev.date, // Auto set next end date too
           startTime: '',
           endTime: '',
           // Keep bookingRef
@@ -90,8 +138,10 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity' 
       setFlightSegments(flightSegments.filter((_, i) => i !== index));
   };
 
-  // Simulate fetching an image from a site based on the item details
   const fetchImage = (item: Partial<TripItem>) => {
+      // Prioritize user provided URL/Upload
+      if (item.imageUrl && item.imageUrl.trim() !== '') return item.imageUrl;
+
       const loc = item.location || item.pickupLocation || '';
       const seed = `${item.title} ${loc} ${item.type}`;
       return `https://picsum.photos/seed/${encodeURIComponent(seed)}/300/300`;
@@ -185,7 +235,8 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity' 
         cost: undefined,
         departureAirport: '',
         arrivalAirport: '',
-        endDate: ''
+        endDate: '',
+        imageUrl: ''
     });
   }
 
@@ -266,7 +317,7 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity' 
                     <DateInput 
                         label="Departure Date" 
                         value={formData.date || ''} 
-                        onChange={val => setFormData({...formData, date: val})} 
+                        onChange={handleStartDateChange} 
                         required
                         icon={Calendar}
                         iconColor="green"
@@ -367,7 +418,7 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity' 
                          <DateInput 
                             label="Pick-up Date"
                             value={formData.date || ''} 
-                            onChange={val => setFormData({...formData, date: val})} 
+                            onChange={handleStartDateChange} 
                             required
                             icon={Calendar}
                             iconColor="blue"
@@ -458,7 +509,7 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity' 
                         <label className="text-xs font-black uppercase text-slate-400">Check-in</label>
                         <DateInput 
                             value={formData.date || ''} 
-                            onChange={val => setFormData({...formData, date: val})} 
+                            onChange={handleStartDateChange} 
                             required
                             icon={Calendar}
                         />
@@ -511,7 +562,7 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity' 
                     <DateInput 
                         label="Date" 
                         value={formData.date || ''} 
-                        onChange={val => setFormData({...formData, date: val})} 
+                        onChange={handleStartDateChange} 
                         required
                         icon={Calendar}
                         iconColor="green"
@@ -544,8 +595,8 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity' 
               </div>
           )}
           
-          {/* COMMON FIELDS (Cost) */}
-          <div className="mt-8 pt-4 border-t-2 border-slate-100 dark:border-slate-700">
+          {/* COMMON FIELDS (Cost + Image) */}
+          <div className="mt-8 pt-4 border-t-2 border-slate-100 dark:border-slate-700 space-y-4">
              <Input 
                 label="Total Cost" 
                 type="number"
@@ -555,6 +606,34 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity' 
                 icon={DollarSign}
                 iconColor="green"
             />
+             
+             {/* Image Upload Replacement */}
+             <div className="w-full">
+                <label className="block text-xs font-black text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-widest pl-2">Photo / Ticket</label>
+                <div className="flex items-center gap-3">
+                   <div className="w-[4.5rem] h-[4.5rem] shrink-0 flex items-center justify-center rounded-2xl bg-gradient-to-br from-pink-400 to-rose-500 shadow-pink-500/50 border-b-[6px] border-pink-600 text-white">
+                      <ImageIcon className="w-8 h-8 drop-shadow-md" strokeWidth={3} />
+                   </div>
+                   <div className="flex-1 relative h-[4.5rem]">
+                      <div className="absolute inset-0 bg-slate-100 dark:bg-slate-800 rounded-2xl border-[3px] border-slate-300 dark:border-slate-700 shadow-inner flex items-center px-5">
+                          <span className="text-slate-400 font-bold truncate">
+                              {formData.imageUrl ? 'Image Selected (Ready to Save)' : 'Tap to upload image...'}
+                          </span>
+                      </div>
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      />
+                   </div>
+                </div>
+                {formData.imageUrl && (
+                    <div className="mt-2 ml-[5.25rem]">
+                        <img src={formData.imageUrl} alt="Preview" className="h-20 w-auto rounded-lg border-2 border-white shadow-md object-cover" />
+                    </div>
+                )}
+             </div>
           </div>
 
           <div className="flex flex-col gap-3 pt-4">
@@ -592,10 +671,56 @@ const TripItemCard: React.FC<{ item: TripItem }> = ({ item }) => {
     }
   }
 
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const text = `
+Trip: ${item.title}
+When: ${item.date} ${item.startTime || ''}
+Location: ${item.location || item.departureAirport || ''}
+Booking: ${item.bookingRef || 'N/A'}
+Details: ${item.details || ''}
+    `.trim();
+    navigator.clipboard.writeText(text);
+    alert("Trip details copied!");
+  };
+
   return (
-    <Card className="flex flex-col h-full group">
-       <div className="relative h-48 overflow-hidden border-b-4 border-slate-100 dark:border-slate-800">
-           <img src={item.imageUrl || `https://picsum.photos/seed/${item.title}/400/300`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={item.title} />
+    <Card className={`flex flex-col h-full group overflow-visible ${item.type === 'car' ? 'border-orange-200 dark:border-orange-900/50' : ''}`}>
+       
+       {/* 1. HEADER (Title, Time, Actions) */}
+       <div className="p-5 flex flex-col space-y-2 bg-white dark:bg-slate-800 border-b-2 border-slate-50 dark:border-slate-700 relative z-20 rounded-t-[1.8rem]">
+           <div className="flex justify-between items-start">
+               <div className="flex flex-col pr-4">
+                   <h4 className="text-xl font-black text-slate-800 dark:text-white leading-tight">{item.title}</h4>
+                   {(item.startTime || item.endTime) && (
+                       <div className="flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400 mt-1">
+                           <Clock className="w-4 h-4 text-brand-500" />
+                           <span>{formatTime(item.startTime)} {item.endTime ? `- ${formatTime(item.endTime)}` : ''}</span>
+                       </div>
+                   )}
+               </div>
+               <div className="flex items-center gap-1 shrink-0">
+                  <button onClick={handleCopy} className="p-2 text-slate-300 hover:text-brand-500 transition-colors bg-slate-50 dark:bg-slate-700 rounded-lg" title="Copy Details">
+                      <Copy className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={(e) => { 
+                        e.stopPropagation(); 
+                        if(confirm('Delete item?')) {
+                            db.items.delete(item.id!);
+                        } 
+                    }}
+                    className="p-2 text-slate-300 hover:text-red-500 transition-colors bg-slate-50 dark:bg-slate-700 rounded-lg"
+                  >
+                      <Trash2 className="w-4 h-4" />
+                  </button>
+               </div>
+           </div>
+       </div>
+
+       {/* 2. IMAGE SECTION (Below Text) */}
+       <div className="relative h-48 overflow-hidden bg-slate-100 dark:bg-slate-900 z-10">
+           <img src={item.imageUrl || `https://picsum.photos/seed/${item.title}/400/300`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-90 group-hover:opacity-100" alt={item.title} />
            <div className="absolute top-4 left-4">
                <div className={`p-3 rounded-xl shadow-lg backdrop-blur-md font-bold ${getIconColor(item.type)}`}>
                    <CategoryIcon type={item.type} className="w-6 h-6" />
@@ -608,49 +733,47 @@ const TripItemCard: React.FC<{ item: TripItem }> = ({ item }) => {
            )}
        </div>
        
-       <div className="p-5 flex-1 flex flex-col space-y-3 bg-white dark:bg-slate-800">
-           <div className="flex justify-between items-start">
-              <h4 className="text-xl font-black text-slate-800 dark:text-white leading-tight">{item.title}</h4>
-              <button 
-                onClick={(e) => { 
-                    e.stopPropagation(); 
-                    if(confirm('Delete item?')) {
-                        db.items.delete(item.id!);
-                    } 
-                }}
-                className="text-slate-300 hover:text-red-500 transition-colors p-1"
-              >
-                  <Trash2 className="w-4 h-4" />
-              </button>
-           </div>
+       {/* 3. DETAILS BODY */}
+       <div className="p-5 flex-1 flex flex-col space-y-4 bg-white dark:bg-slate-800 rounded-b-[1.8rem]">
            
-           <div className="space-y-2">
-               {/* Time */}
-               {(item.startTime || item.endTime) && (
-                   <div className="flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400">
-                       <Clock className="w-4 h-4 text-brand-500" />
-                       <span>{formatTime(item.startTime)} {item.endTime ? `- ${formatTime(item.endTime)}` : ''}</span>
-                   </div>
-               )}
+           {/* Special Highlighting for Car Rentals */}
+           {item.type === 'car' && (
+               <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-xl border-2 border-orange-200 dark:border-orange-800 space-y-2 relative overflow-hidden">
+                   <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-orange-200 to-transparent opacity-20 pointer-events-none rounded-bl-full"></div>
+                   {item.bookingRef && (
+                       <div className="flex items-center justify-between border-b border-orange-100 dark:border-orange-800/50 pb-2 mb-2">
+                           <span className="text-xs font-black uppercase text-orange-600 dark:text-orange-400 tracking-wider">Ref #</span>
+                           <span className="font-mono font-bold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 px-2 py-0.5 rounded shadow-sm">{item.bookingRef}</span>
+                       </div>
+                   )}
+                   {(item.pickupLocation || item.dropoffLocation) && (
+                       <div className="text-xs font-bold text-slate-600 dark:text-slate-300 flex flex-col gap-2">
+                           {item.pickupLocation && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-500"></div><span><span className="text-orange-500 opacity-75">PICKUP:</span> {item.pickupLocation}</span></div>}
+                           {item.dropoffLocation && <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-300"></div><span><span className="text-orange-500 opacity-75">DROP:</span> {item.dropoffLocation}</span></div>}
+                       </div>
+                   )}
+               </div>
+           )}
 
+           <div className="space-y-2">
                {/* Location */}
-               {(item.location || item.pickupLocation || item.departureAirport) && (
+               {(item.location || item.departureAirport) && item.type !== 'car' && (
                    <div className="flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400">
                        <MapPin className="w-4 h-4 text-brand-500" />
-                       <span className="truncate">{item.location || item.pickupLocation || `${item.departureAirport} -> ${item.arrivalAirport}`}</span>
+                       <span className="truncate">{item.location || `${item.departureAirport} -> ${item.arrivalAirport}`}</span>
                    </div>
                )}
                
                {/* Details truncated */}
                {item.details && (
-                   <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mt-2 font-medium bg-slate-50 dark:bg-slate-900/50 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
+                   <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-3 font-medium bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
                        {item.details}
                    </p>
                )}
            </div>
 
-           {/* Booking Ref / Link */}
-           {(item.bookingRef || item.bookingLink) && (
+           {/* Booking Ref / Link (General) */}
+           {item.type !== 'car' && (item.bookingRef || item.bookingLink) && (
                <div className="pt-3 mt-auto flex items-center gap-2">
                    {item.bookingRef && (
                        <span className="px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded-md text-xs font-mono font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
@@ -690,6 +813,41 @@ export const TripDetailPage = () => {
         setSelectedCountryData(null);
     }
   }, [activeTab]);
+
+  // --- Notification Logic ---
+  useEffect(() => {
+    if (!items || items.length === 0) return;
+    
+    // Request permission on load
+    if (Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+
+    const checkUpcoming = () => {
+        const now = new Date();
+        items.forEach(item => {
+            if (!item.date || !item.startTime) return;
+            // Create item date object
+            const itemTime = new Date(`${item.date}T${item.startTime}`);
+            const diffMs = itemTime.getTime() - now.getTime();
+            const diffMins = Math.floor(diffMs / 60000);
+
+            // Alert if event is in exactly 60 minutes (or close enough in the interval)
+            // Using a range (59-61) to catch it during interval checks
+            if (diffMins >= 59 && diffMins <= 61) {
+                if (Notification.permission === 'granted') {
+                    new Notification(`Upcoming: ${item.title}`, {
+                        body: `Starting in 1 hour at ${item.startTime}.`,
+                        icon: '/favicon.ico'
+                    });
+                }
+            }
+        });
+    };
+
+    const interval = setInterval(checkUpcoming, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [items]);
 
   // Derive days
   const days = trip ? getDaysArray(trip.startDate, trip.endDate) : [];
@@ -733,11 +891,7 @@ export const TripDetailPage = () => {
         URL.revokeObjectURL(url);
     } catch (e) {
         console.error(e);
-        // Fallback to simple download if share fails (e.g. user cancelled)
-        // Only retry with download if the error wasn't a user cancellation
         if ((e as Error).name !== 'AbortError') {
-             // We can optionally force download here, but usually, explicit button click is better.
-             // For now, let's just log it. 
              alert("Could not share. Please try again or check browser permissions.");
         }
     }
@@ -771,7 +925,7 @@ export const TripDetailPage = () => {
               date: dateStr,
               startTime: act.timeOfDay === 'Morning' ? '09:00' : act.timeOfDay === 'Afternoon' ? '14:00' : '19:00',
               completed: false,
-              imageUrl: imageUrl // Sharing image for the day's first activity or generating distinct ones would be better, but this works
+              imageUrl: imageUrl
             });
           }
         }

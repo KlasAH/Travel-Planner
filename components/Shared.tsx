@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useRef, useImperativeHandle } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Settings, Map, Calendar as CalendarIcon, Plane, Car, Hotel, Activity, Home, Sun, Moon, Plus, Check, Trash2, Clock, DollarSign, MapPin, ChevronDown, X } from 'lucide-react';
+import { ArrowLeft, Settings, Map, Calendar as CalendarIcon, Plane, Car, Hotel, Activity, Home, Sun, Moon, Plus, Check, Trash2, Clock, DollarSign, MapPin, ChevronDown, X, ChevronLeft } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 
 // --- UI Primitives ---
@@ -133,44 +133,7 @@ export const Input = React.forwardRef<HTMLInputElement | HTMLTextAreaElement, Re
 );
 Input.displayName = "Input";
 
-// --- Custom Scrollable Time Input ---
-
-const ScrollColumn = ({ options, value, onChange, label }: { options: string[], value: string, onChange: (val: string) => void, label?: string }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Center selected item on open
-    if (containerRef.current) {
-      const selectedEl = containerRef.current.querySelector(`[data-value="${value}"]`);
-      if (selectedEl) {
-        selectedEl.scrollIntoView({ block: 'center' });
-      }
-    }
-  }, []);
-
-  return (
-    <div className="flex flex-col items-center">
-      {label && <span className="text-xs font-bold text-slate-400 mb-2">{label}</span>}
-      <div 
-        ref={containerRef}
-        className="w-20 h-48 overflow-y-auto no-scrollbar snap-y snap-mandatory py-[calc(50%)]" // Padding creates "empty" space top/bottom
-      >
-        <div className="h-20" /> {/* Spacer top */}
-        {options.map((opt) => (
-          <div 
-            key={opt}
-            data-value={opt}
-            onClick={() => onChange(opt)}
-            className={`h-10 flex items-center justify-center snap-center cursor-pointer transition-all duration-200 ${opt === value ? 'text-3xl font-black text-brand-500 scale-110' : 'text-xl font-bold text-slate-300'}`}
-          >
-            {opt}
-          </div>
-        ))}
-        <div className="h-20" /> {/* Spacer bottom */}
-      </div>
-    </div>
-  );
-}
+// --- Improved Digital Clock Time Picker ---
 
 interface TimeInputProps {
   value: string; // HH:mm format
@@ -185,16 +148,20 @@ export const TimeInput: React.FC<TimeInputProps> = ({
   value, onChange, label, icon: Icon = Clock, iconColor = 'purple', className
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [view, setView] = useState<'HOUR' | 'MINUTE'>('HOUR');
   
   // Parse current value
-  const [hours, minutes] = (value || '09:00').split(':');
-  
-  // Generate arrays
-  const hoursArray = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
-  const minutesArray = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+  const [selectedHour, selectedMinute] = (value || '09:00').split(':');
 
-  const handleTimeSelect = (h: string, m: string) => {
-    onChange(`${h}:${m}`);
+  const handleHourSelect = (h: string) => {
+    onChange(`${h}:${selectedMinute}`);
+    setView('MINUTE'); // Auto advance to minute
+  };
+
+  const handleMinuteSelect = (m: string) => {
+    onChange(`${selectedHour}:${m}`);
+    setIsOpen(false);
+    setView('HOUR'); // Reset for next time
   };
 
   return (
@@ -217,42 +184,85 @@ export const TimeInput: React.FC<TimeInputProps> = ({
 
         {/* Picker Modal */}
         {isOpen && (
-          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsOpen(false)}>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200" onClick={() => setIsOpen(false)}>
             <div 
-              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 shadow-2xl animate-in slide-in-from-bottom-20 duration-300 border-[6px] border-slate-100 dark:border-slate-800" 
+              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-0 shadow-2xl border-[6px] border-slate-200 dark:border-slate-700 transform transition-all overflow-hidden" 
               onClick={e => e.stopPropagation()}
             >
-               <div className="flex items-center justify-between mb-6">
-                 <h3 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">Select Time</h3>
-                 <button onClick={() => setIsOpen(false)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 transition-colors">
-                   <X className="w-6 h-6 text-slate-500" />
-                 </button>
-               </div>
-
-               <div className="flex justify-center items-center gap-6 h-56 relative bg-slate-50 dark:bg-slate-950/50 rounded-3xl border-2 border-slate-100 dark:border-slate-800 mb-8 overflow-hidden">
-                  {/* Highlight Bar */}
-                  <div className="absolute top-1/2 -translate-y-1/2 left-4 right-4 h-12 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-brand-200 dark:border-brand-800 pointer-events-none z-0" />
-                  
-                  <div className="relative z-10 flex items-center gap-2">
-                    <ScrollColumn 
-                      options={hoursArray} 
-                      value={hours} 
-                      onChange={(h) => handleTimeSelect(h, minutes)} 
-                      label="HOURS"
-                    />
-                    <div className="text-2xl font-black text-slate-300 pb-6">:</div>
-                    <ScrollColumn 
-                      options={minutesArray} 
-                      value={minutes} 
-                      onChange={(m) => handleTimeSelect(hours, m)} 
-                      label="MINUTES"
-                    />
+               {/* Digital Clock Header */}
+               <div className="bg-slate-100 dark:bg-slate-800 p-8 flex flex-col items-center justify-center border-b-2 border-slate-200 dark:border-slate-700">
+                  <div className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    {view === 'HOUR' ? 'Set Hour' : 'Set Minute'}
+                  </div>
+                  <div className="flex items-center gap-1">
+                     <button 
+                       onClick={() => setView('HOUR')} 
+                       className={`text-6xl font-black tracking-tight rounded-xl px-2 py-1 transition-all ${
+                         view === 'HOUR' 
+                          ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/30 scale-110' 
+                          : 'text-slate-300 dark:text-slate-600 hover:text-slate-400'
+                       }`}
+                     >
+                       {selectedHour}
+                     </button>
+                     <span className="text-6xl font-black text-slate-300 dark:text-slate-600 pb-2">:</span>
+                     <button 
+                       onClick={() => setView('MINUTE')} 
+                       className={`text-6xl font-black tracking-tight rounded-xl px-2 py-1 transition-all ${
+                         view === 'MINUTE' 
+                          ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/30 scale-110' 
+                          : 'text-slate-300 dark:text-slate-600 hover:text-slate-400'
+                       }`}
+                     >
+                       {selectedMinute}
+                     </button>
                   </div>
                </div>
-               
-               <Button size="xl" onClick={() => setIsOpen(false)} className="w-full">
-                 Confirm {value}
-               </Button>
+
+               {/* Grid Selection Body */}
+               <div className="p-6 bg-white dark:bg-slate-900">
+                  {view === 'HOUR' && (
+                    <div className="grid grid-cols-6 gap-2 animate-in slide-in-from-right-4 duration-200">
+                        {Array.from({length: 24}, (_, i) => String(i).padStart(2, '0')).map(h => (
+                             <button
+                                key={h}
+                                onClick={() => handleHourSelect(h)}
+                                className={`h-10 w-full rounded-lg font-bold text-sm transition-all ${
+                                    h === selectedHour 
+                                    ? 'bg-brand-500 text-white shadow-md' 
+                                    : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                }`}
+                             >
+                                {h}
+                             </button>
+                        ))}
+                    </div>
+                  )}
+
+                  {view === 'MINUTE' && (
+                    <div className="space-y-4 animate-in slide-in-from-right-4 duration-200">
+                        <div className="grid grid-cols-4 gap-3">
+                            {/* Main 5-min intervals */}
+                            {['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'].map(m => (
+                                <button
+                                    key={m}
+                                    onClick={() => handleMinuteSelect(m)}
+                                    className={`h-12 rounded-xl font-bold text-lg transition-all ${
+                                        m === selectedMinute 
+                                        ? 'bg-brand-500 text-white shadow-md' 
+                                        : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                    }`}
+                                >
+                                    {m}
+                                </button>
+                            ))}
+                        </div>
+                        <button onClick={() => setView('HOUR')} className="w-full py-2 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600 flex items-center justify-center">
+                             <ChevronLeft className="w-4 h-4 mr-1" /> Back to Hours
+                        </button>
+                    </div>
+                  )}
+               </div>
             </div>
           </div>
         )}
