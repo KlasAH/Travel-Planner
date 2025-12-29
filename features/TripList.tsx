@@ -5,8 +5,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../db';
 import { Layout, Button, Card, Input, Select, ChipGroup, DateInput } from '../components/Shared';
-import { Plus, Calendar, MapPin, ChevronRight, Trash2, Globe, Tag, Sparkles, Filter } from 'lucide-react';
-import { Trip } from '../types';
+import { Plus, Calendar, MapPin, ChevronRight, Trash2, Globe, Tag, Sparkles, Filter, DownloadCloud, Upload } from 'lucide-react';
+import { Trip, SharedTripData } from '../types';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import { Tooltip } from "react-tooltip";
 
@@ -286,6 +286,47 @@ export const TripListPage = () => {
     navigate(`/trip/${tripId}`);
   };
 
+  const handleImportTrip = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result as string;
+        const sharedData: SharedTripData = JSON.parse(text);
+
+        if (!sharedData.trip || !Array.isArray(sharedData.items)) {
+          throw new Error("Invalid file format");
+        }
+
+        await (db as any).transaction('rw', db.trips, db.items, async () => {
+          // Remove ID from imported trip to auto-increment a new one
+          const { id, ...tripData } = sharedData.trip;
+          const newTripId = await db.trips.add(tripData);
+
+          // Add items with new tripId
+          const newItems = sharedData.items.map(item => {
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              const { id, tripId, ...itemData } = item;
+              return { ...itemData, tripId: newTripId };
+          });
+          
+          await db.items.bulkAdd(newItems);
+        });
+
+        alert(`Successfully imported trip: ${sharedData.trip.title || sharedData.trip.destination}`);
+        // No need to reload, live query updates automatically
+      } catch (err) {
+        console.error(err);
+        alert('Failed to import data. Invalid file format.');
+      }
+    };
+    reader.readAsText(file);
+    // Reset input
+    event.target.value = '';
+  };
+
   const deleteTrip = async (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
     if (confirm("Delete this trip and all its items?")) {
@@ -391,6 +432,22 @@ export const TripListPage = () => {
           </div>
       )}
 
+      <div className="flex justify-end mb-4">
+         <div className="relative overflow-hidden group">
+            <Button size="sm" variant="secondary" className="pl-10">
+                <Upload className="w-4 h-4 absolute left-4" />
+                Import Trip
+            </Button>
+            <input 
+                type="file" 
+                accept=".json" 
+                onChange={handleImportTrip}
+                className="absolute inset-0 opacity-0 cursor-pointer"
+                title="Import a trip file"
+            />
+         </div>
+      </div>
+
       {trips && trips.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pb-32">
           {filteredTrips.map(trip => {
@@ -472,6 +529,20 @@ export const TripListPage = () => {
             <Plus className="w-6 h-6 mr-2" strokeWidth={4} />
             Plan Adventure
           </Button>
+
+          {/* Empty State Import Button */}
+          <div className="relative overflow-hidden group inline-block">
+             <Button size="md" variant="secondary" className="pl-10">
+                 <Upload className="w-4 h-4 absolute left-4" />
+                 Import from File
+             </Button>
+             <input 
+                 type="file" 
+                 accept=".json" 
+                 onChange={handleImportTrip}
+                 className="absolute inset-0 opacity-0 cursor-pointer"
+             />
+          </div>
         </div>
       )}
 

@@ -3,9 +3,9 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
-import { TripItem, ItemType } from '../types';
+import { Trip, TripItem, ItemType, SharedTripData } from '../types';
 import { Layout, Button, Card, CategoryIcon, Input, Fab, DateInput, TimeInput } from '../components/Shared';
-import { Plus, Trash2, Calendar, MapPin, Clock, DollarSign, Check, Wand2, Tag, AlignLeft, Hash, Plane, Key, Home, Car, X, Link as LinkIcon, ExternalLink, ArrowRight, Globe } from 'lucide-react';
+import { Plus, Trash2, Calendar, MapPin, Clock, DollarSign, Check, Wand2, Tag, AlignLeft, Hash, Plane, Key, Home, Car, X, Link as LinkIcon, ExternalLink, ArrowRight, Globe, ChevronRight, Share2 } from 'lucide-react';
 import { generateItinerary, Suggestion } from '../services/geminiService';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import { Tooltip } from "react-tooltip";
@@ -573,7 +573,7 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity' 
 };
 
 // --- TripItemCard Component ---
-const TripItemCard = ({ item }: { item: TripItem }) => {
+const TripItemCard: React.FC<{ item: TripItem }> = ({ item }) => {
 
   const formatTime = (time?: string) => {
     if (!time) return '';
@@ -671,6 +671,7 @@ const TripItemCard = ({ item }: { item: TripItem }) => {
 
 export const TripDetailPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const tripId = parseInt(id || '0');
   const trip = useLiveQuery(() => db.trips.get(tripId));
   const allTrips = useLiveQuery(() => db.trips.toArray());
@@ -679,9 +680,68 @@ export const TripDetailPage = () => {
   const [isModalOpen, setModalOpen] = useState(false);
   const [selectedDateForAdd, setSelectedDateForAdd] = useState<string | undefined>(undefined);
   const [generating, setGenerating] = useState(false);
+  
+  // Map State
+  const [selectedCountryData, setSelectedCountryData] = useState<{name: string, trips: Trip[]} | null>(null);
+
+  useEffect(() => {
+    // Reset selection when leaving map tab
+    if (activeTab !== 'map') {
+        setSelectedCountryData(null);
+    }
+  }, [activeTab]);
 
   // Derive days
   const days = trip ? getDaysArray(trip.startDate, trip.endDate) : [];
+
+  const handleShareTrip = async () => {
+    if (!trip || !items) return;
+    try {
+        const shareData: SharedTripData = {
+            trip,
+            items,
+            sharedAt: new Date().toISOString(),
+            version: 1
+        };
+        
+        const fileName = `trip-${trip.destination.toLowerCase().replace(/\s+/g, '-')}.json`;
+        const jsonString = JSON.stringify(shareData, null, 2);
+        
+        // Try Native Share API first (Mobile/Tablets/Modern Desktops)
+        if (navigator.share) {
+            const file = new File([jsonString], fileName, { type: 'application/json' });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    title: `Trip to ${trip.destination}`,
+                    text: `Here is my travel plan for ${trip.destination}. Import this file into your Travel Planner app!`,
+                    files: [file]
+                });
+                return;
+            }
+        }
+
+        // Fallback to Download
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        console.error(e);
+        // Fallback to simple download if share fails (e.g. user cancelled)
+        // Only retry with download if the error wasn't a user cancellation
+        if ((e as Error).name !== 'AbortError') {
+             // We can optionally force download here, but usually, explicit button click is better.
+             // For now, let's just log it. 
+             alert("Could not share. Please try again or check browser permissions.");
+        }
+    }
+  };
 
   const handleGenerateAI = async () => {
     if (!trip) return;
@@ -757,10 +817,17 @@ export const TripDetailPage = () => {
                </div>
             </div>
             
-            <div className="text-right hidden sm:block">
-              <div className="bg-black/30 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20 text-white font-black text-xl">
-                 {days.length} Days
-              </div>
+            <div className="flex flex-col gap-3 items-end">
+                <div className="text-right hidden sm:block">
+                    <div className="bg-black/30 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20 text-white font-black text-xl">
+                        {days.length} Days
+                    </div>
+                </div>
+                
+                {/* Share Button - Native Share or Download */}
+                <Button onClick={handleShareTrip} className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-md border-white/40 shadow-xl flex" size="sm">
+                    <Share2 className="w-4 h-4 mr-2" /> Share Trip
+                </Button>
             </div>
           </div>
         </div>
@@ -800,40 +867,104 @@ export const TripDetailPage = () => {
       {/* Content Area */}
       <div className="pb-32">
       {activeTab === 'map' ? (
-        <Card className="p-0 overflow-hidden h-[500px] border-slate-200 dark:border-slate-700">
+        <Card className="p-0 overflow-hidden h-[500px] border-slate-200 dark:border-slate-700 relative">
              <div className="relative w-full h-full bg-slate-50 dark:bg-slate-900">
+                 
+                 {/* Detail Overlay */}
+                 {selectedCountryData && (
+                    <div className="absolute top-4 right-4 z-30 w-72 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-in slide-in-from-right-10 duration-300">
+                        <div className="bg-brand-500 p-4 flex items-center justify-between">
+                            <h3 className="font-black text-white text-lg flex items-center gap-2">
+                                <Globe className="w-5 h-5 text-white/80" />
+                                {selectedCountryData.name}
+                            </h3>
+                            <button 
+                                onClick={() => setSelectedCountryData(null)}
+                                className="p-1 rounded-full hover:bg-white/20 text-white transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest px-4 py-2">
+                                {selectedCountryData.trips.length} {selectedCountryData.trips.length === 1 ? 'Trip' : 'Trips'} Found
+                            </p>
+                            <div className="space-y-1">
+                                {selectedCountryData.trips.map(t => (
+                                    <div 
+                                        key={t.id} 
+                                        onClick={() => {
+                                            if (t.id !== tripId) {
+                                                navigate(`/trip/${t.id}`);
+                                            }
+                                        }}
+                                        className={`p-3 rounded-xl flex items-center justify-between cursor-pointer transition-colors group ${t.id === tripId ? 'bg-brand-50 dark:bg-brand-900/20 border-l-4 border-brand-500' : 'hover:bg-slate-50 dark:hover:bg-slate-800 border-l-4 border-transparent'}`}
+                                    >
+                                        <div>
+                                            <div className={`font-bold text-sm ${t.id === tripId ? 'text-brand-700 dark:text-brand-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                                                {t.title || t.destination} {t.id === tripId && '(Current)'}
+                                            </div>
+                                            <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-1">
+                                                <Calendar className="w-3 h-3" />
+                                                {new Date(t.startDate).getFullYear()}
+                                            </div>
+                                        </div>
+                                        {t.id !== tripId && <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500" />}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                 )}
+
+                 {/* Legend / Info */}
                  <div className="absolute top-4 left-4 z-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm max-w-xs">
                      <h3 className="text-lg font-black text-slate-900 dark:text-white mb-2">Travel Context</h3>
                      <div className="space-y-2 text-xs font-bold uppercase tracking-wide">
                         <div className="flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full bg-brand-500 shadow-brand-500/50 shadow-sm"></span>
-                            <span className="text-slate-600 dark:text-slate-300">Current Trip: {trip.destination}</span>
+                            <span className="w-3 h-3 rounded-full bg-brand-500 shadow-brand-500/50 shadow-sm animate-pulse"></span>
+                            <span className="text-slate-600 dark:text-slate-300">Current: {trip.destination}</span>
                         </div>
                         {allTrips && allTrips.length > 1 && (
                             <div className="flex items-center gap-2">
-                                <span className="w-3 h-3 rounded-full bg-indigo-300 dark:bg-indigo-700"></span>
-                                <span className="text-slate-500 dark:text-slate-400">Other Trips ({allTrips.length - 1})</span>
+                                <span className="w-3 h-3 rounded-full bg-indigo-400 dark:bg-indigo-500"></span>
+                                <span className="text-slate-500 dark:text-slate-400">Past Trips</span>
                             </div>
                         )}
+                        <div className="text-[10px] text-slate-400 mt-2 font-medium normal-case tracking-normal">
+                            Click highlighted countries to view trip details.
+                        </div>
                      </div>
                  </div>
+
                  <ComposableMap projection="geoMercator" projectionConfig={{ scale: 110, center: [0, 20] }} style={{ width: "100%", height: "100%" }}>
                     <ZoomableGroup zoom={1} minZoom={0.7} maxZoom={4}>
                       <Geographies geography={GEO_URL}>
                         {({ geographies }) =>
                           geographies.map((geo) => {
                             const countryName = geo.properties.name;
-                            const isCurrent = trip.destination === countryName || countryName.includes(trip.destination) || trip.destination.includes(countryName);
-                            const isVisited = !isCurrent && allTrips?.some(t => 
+                            
+                            // Find all associated trips for this country
+                            const relatedTrips = allTrips?.filter(t => 
                                t.destination === countryName || 
                                countryName.includes(t.destination) ||
                                t.destination.includes(countryName)
-                            );
+                            ) || [];
+
+                            const isCurrent = relatedTrips.some(t => t.id === tripId);
+                            const isVisited = relatedTrips.length > 0;
                             
                             return (
                               <Geography
                                 key={geo.rsmKey}
                                 geography={geo}
+                                onClick={() => {
+                                    if (isVisited) {
+                                        setSelectedCountryData({ name: countryName, trips: relatedTrips });
+                                    } else {
+                                        setSelectedCountryData(null);
+                                    }
+                                }}
                                 data-tooltip-id="detail-map-tooltip"
                                 data-tooltip-content={countryName}
                                 fill={isCurrent ? "#0ea5e9" : isVisited ? "#818cf8" : "var(--map-default)"}
@@ -844,12 +975,14 @@ export const TripDetailPage = () => {
                                       fill: isCurrent ? "#0ea5e9" : isVisited ? "#6366f1" : "#cbd5e1", 
                                       outline: "none", 
                                       transition: "all 0.3s",
-                                      filter: isCurrent ? "drop-shadow(0 0 8px rgba(14,165,233,0.4))" : "none"
+                                      filter: isCurrent ? "drop-shadow(0 0 8px rgba(14,165,233,0.5))" : "none",
+                                      cursor: isVisited ? "pointer" : "default"
                                   },
                                   hover: { 
                                       fill: isCurrent ? "#0284c7" : isVisited ? "#4f46e5" : "#94a3b8", 
                                       outline: "none", 
-                                      cursor: "pointer" 
+                                      cursor: isVisited ? "pointer" : "default",
+                                      filter: isVisited ? "brightness(1.1)" : "none"
                                   },
                                   pressed: { fill: "#0284c7", outline: "none" }
                                 }}
@@ -893,8 +1026,8 @@ export const TripDetailPage = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {dayItems && dayItems.length > 0 ? (
-                    dayItems.map(item => (
-                      <TripItemCard key={item.id} item={item} />
+                    dayItems.map((item, idx) => (
+                      <TripItemCard key={item.id || idx} item={item} />
                     ))
                   ) : (
                     <div className="col-span-full border-4 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 flex flex-col items-center justify-center text-slate-400 text-base font-medium hover:border-brand-300 dark:hover:border-brand-700 transition-colors bg-white/50 dark:bg-slate-900/50">
@@ -909,8 +1042,8 @@ export const TripDetailPage = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredItems?.map(item => (
-            <TripItemCard key={item.id} item={item} />
+          {filteredItems?.map((item, idx) => (
+            <TripItemCard key={item.id || idx} item={item} />
           ))}
           {filteredItems?.length === 0 && (
             <div className="col-span-full text-center py-20 text-slate-400 dark:text-slate-500 font-bold text-lg">

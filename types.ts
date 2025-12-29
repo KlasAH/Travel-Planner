@@ -1,4 +1,5 @@
 
+
 export interface Trip {
   id?: number;
   title?: string; // Name of the trip
@@ -52,6 +53,13 @@ export interface BackupData {
   trips: Trip[];
   items: TripItem[];
   exportedAt: string;
+}
+
+export interface SharedTripData {
+  trip: Trip;
+  items: TripItem[];
+  sharedAt: string;
+  version: number;
 }
 
 export interface AIItineraryRequest {
