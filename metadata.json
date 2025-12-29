@@ -1,0 +1,5 @@
+{
+  "name": "Travel Planner",
+  "description": "A comprehensive travel planner with offline support, detailed itinerary management, and AI-powered trip suggestions.",
+  "requestFramePermissions": []
+}

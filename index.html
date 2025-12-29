@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wanderlust AI Planner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                50: '#f0f9ff',
+                100: '#e0f2fe',
+                200: '#bae6fd',
+                300: '#7dd3fc',
+                400: '#38bdf8',
+                500: '#0ea5e9',
+                600: '#0284c7',
+                700: '#0369a1',
+                800: '#075985',
+                900: '#0c4a6e',
+              }
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/react-datepicker/dist/react-datepicker.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/react-tooltip@5.26.3/dist/react-tooltip.css">
+    <style>
+      body { font-family: 'Inter', sans-serif; }
+      
+      /* Hide scrollbar for chrome/safari/opera */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      /* Hide scrollbar for IE, Edge and Firefox */
+      .no-scrollbar {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+      }
+
+      /* Custom Date Picker hiding */
+      input[type="date"]::-webkit-inner-spin-button,
+      input[type="date"]::-webkit-calendar-picker-indicator {
+          display: none;
+          -webkit-appearance: none;
+      }
+      
+      /* Custom Scrollbar for specific containers */
+      .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(0,0,0,0.05);
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(0,0,0,0.2);
+          border-radius: 10px;
+      }
+
+      /* React Datepicker Customization */
+      .react-datepicker-wrapper {
+        width: 100%;
+      }
+      .react-datepicker {
+        font-family: 'Inter', sans-serif !important;
+        border-radius: 1.5rem !important;
+        border: 4px solid #f1f5f9 !important;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+        overflow: hidden;
+      }
+      .react-datepicker__header {
+        background-color: #f8fafc !important;
+        border-bottom: 2px solid #e2e8f0 !important;
+      }
+      .react-datepicker__day--selected, .react-datepicker__day--keyboard-selected {
+        background-color: #0ea5e9 !important;
+        border-radius: 0.5rem !important;
+        font-weight: bold;
+      }
+      .react-datepicker__day:hover {
+        border-radius: 0.5rem !important;
+      }
+      
+      /* Dark mode overrides for Datepicker */
+      .dark .react-datepicker {
+        background-color: #0f172a !important;
+        border-color: #1e293b !important;
+        color: white !important;
+      }
+      .dark .react-datepicker__header {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+      }
+      .dark .react-datepicker__current-month, 
+      .dark .react-datepicker__day-name,
+      .dark .react-datepicker__day {
+        color: #e2e8f0 !important;
+      }
+      .dark .react-datepicker__day--selected {
+        color: white !important;
+        background-color: #0ea5e9 !important;
+      }
+      .dark .react-datepicker__day:hover {
+        background-color: #334155 !important;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.3.1",
+    "react/": "https://esm.sh/react@18.3.1/",
+    "react-dom": "https://esm.sh/react-dom@18.3.1",
+    "react-dom/": "https://esm.sh/react-dom@18.3.1/",
+    "react-router-dom": "https://esm.sh/react-router-dom@6.22.3?deps=react@18.3.1,react-dom@18.3.1",
+    "lucide-react": "https://esm.sh/lucide-react@0.363.0?deps=react@18.3.1",
+    "dexie": "https://esm.sh/dexie@4.0.8",
+    "dexie-react-hooks": "https://esm.sh/dexie-react-hooks@1.1.7?deps=dexie@4.0.8,react@18.3.1",
+    "react-datepicker": "https://esm.sh/react-datepicker@6.9.0?deps=react@18.3.1,react-dom@18.3.1",
+    "@google/genai": "https://esm.sh/@google/genai@0.2.0",
+    "react-simple-maps": "https://esm.sh/react-simple-maps@3.0.0?deps=react@18.3.1,react-dom@18.3.1",
+    "react-tooltip": "https://esm.sh/react-tooltip@5.26.3?deps=react@18.3.1,react-dom@18.3.1"
+  }
+}
+</script>
+</head>
+  <body class="bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-300">
+    <div id="root"></div>
+  </body>
+</html>
