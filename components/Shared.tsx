@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef, useImperativeHandle } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Settings, Map, Calendar as CalendarIcon, Plane, Car, Hotel, Activity, Home, Sun, Moon, Plus, Check, Trash2, Clock, DollarSign, MapPin, ChevronDown, X, ChevronLeft } from 'lucide-react';
@@ -479,10 +478,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, title }) => {
   const toggleTheme = () => setIsDark(!isDark);
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors duration-300 pb-10 font-sans">
+    <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-slate-950 transition-colors duration-300 pb-10 font-sans">
       {/* Sticky Top Nav */}
       <header className="sticky top-4 z-50 mx-auto w-[96%] max-w-6xl">
-        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[2rem] border-[3px] border-slate-200 dark:border-slate-800 shadow-xl p-3 pl-6 pr-3 flex items-center justify-between">
+        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[2rem] border-[3px] border-slate-300 dark:border-slate-800 shadow-xl p-3 pl-6 pr-3 flex items-center justify-between">
           
           {/* Title on Left */}
           <div className="flex items-center gap-3">
