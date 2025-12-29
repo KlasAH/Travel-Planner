@@ -5,8 +5,13 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { TripItem, ItemType } from '../types';
 import { Layout, Button, Card, CategoryIcon, Input, Fab, DateInput, TimeInput } from '../components/Shared';
-import { Plus, Trash2, Calendar, MapPin, Clock, DollarSign, Check, Wand2, Tag, AlignLeft, Hash, Plane, Key, Home, Car, X, Link as LinkIcon, ExternalLink, ArrowRight } from 'lucide-react';
+import { Plus, Trash2, Calendar, MapPin, Clock, DollarSign, Check, Wand2, Tag, AlignLeft, Hash, Plane, Key, Home, Car, X, Link as LinkIcon, ExternalLink, ArrowRight, Globe } from 'lucide-react';
 import { generateItinerary, Suggestion } from '../services/geminiService';
+import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
+import { Tooltip } from "react-tooltip";
+
+// GeoJSON Url for the world map
+const GEO_URL = "https://raw.githubusercontent.com/deldersveld/topojson/master/world-countries.json";
 
 // Helper to get array of dates between start and end
 const getDaysArray = (start: string, end: string) => {
@@ -567,12 +572,110 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity' 
   );
 };
 
+// --- TripItemCard Component ---
+const TripItemCard = ({ item }: { item: TripItem }) => {
+
+  const formatTime = (time?: string) => {
+    if (!time) return '';
+    const [h, m] = time.split(':');
+    const d = new Date();
+    d.setHours(parseInt(h), parseInt(m));
+    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  };
+
+  const getIconColor = (type: string) => {
+    switch (type) {
+        case 'flight': return 'text-sky-500 bg-sky-100 dark:bg-sky-900/30 dark:text-sky-400';
+        case 'stay': return 'text-purple-500 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-400';
+        case 'car': return 'text-orange-500 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400';
+        default: return 'text-emerald-500 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400';
+    }
+  }
+
+  return (
+    <Card className="flex flex-col h-full group">
+       <div className="relative h-48 overflow-hidden border-b-4 border-slate-100 dark:border-slate-800">
+           <img src={item.imageUrl || `https://picsum.photos/seed/${item.title}/400/300`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={item.title} />
+           <div className="absolute top-4 left-4">
+               <div className={`p-3 rounded-xl shadow-lg backdrop-blur-md font-bold ${getIconColor(item.type)}`}>
+                   <CategoryIcon type={item.type} className="w-6 h-6" />
+               </div>
+           </div>
+           {item.cost && (
+               <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg text-white font-black text-sm flex items-center gap-1">
+                   <DollarSign className="w-3 h-3 text-green-400" /> {item.cost}
+               </div>
+           )}
+       </div>
+       
+       <div className="p-5 flex-1 flex flex-col space-y-3 bg-white dark:bg-slate-800">
+           <div className="flex justify-between items-start">
+              <h4 className="text-xl font-black text-slate-800 dark:text-white leading-tight">{item.title}</h4>
+              <button 
+                onClick={(e) => { 
+                    e.stopPropagation(); 
+                    if(confirm('Delete item?')) {
+                        db.items.delete(item.id!);
+                    } 
+                }}
+                className="text-slate-300 hover:text-red-500 transition-colors p-1"
+              >
+                  <Trash2 className="w-4 h-4" />
+              </button>
+           </div>
+           
+           <div className="space-y-2">
+               {/* Time */}
+               {(item.startTime || item.endTime) && (
+                   <div className="flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400">
+                       <Clock className="w-4 h-4 text-brand-500" />
+                       <span>{formatTime(item.startTime)} {item.endTime ? `- ${formatTime(item.endTime)}` : ''}</span>
+                   </div>
+               )}
+
+               {/* Location */}
+               {(item.location || item.pickupLocation || item.departureAirport) && (
+                   <div className="flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400">
+                       <MapPin className="w-4 h-4 text-brand-500" />
+                       <span className="truncate">{item.location || item.pickupLocation || `${item.departureAirport} -> ${item.arrivalAirport}`}</span>
+                   </div>
+               )}
+               
+               {/* Details truncated */}
+               {item.details && (
+                   <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mt-2 font-medium bg-slate-50 dark:bg-slate-900/50 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
+                       {item.details}
+                   </p>
+               )}
+           </div>
+
+           {/* Booking Ref / Link */}
+           {(item.bookingRef || item.bookingLink) && (
+               <div className="pt-3 mt-auto flex items-center gap-2">
+                   {item.bookingRef && (
+                       <span className="px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded-md text-xs font-mono font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
+                           #{item.bookingRef}
+                       </span>
+                   )}
+                   {item.bookingLink && (
+                       <a href={item.bookingLink} target="_blank" rel="noreferrer" className="ml-auto text-brand-500 hover:underline text-xs font-bold flex items-center gap-1">
+                           Link <ExternalLink className="w-3 h-3" />
+                       </a>
+                   )}
+               </div>
+           )}
+       </div>
+    </Card>
+  );
+};
+
 export const TripDetailPage = () => {
   const { id } = useParams();
   const tripId = parseInt(id || '0');
   const trip = useLiveQuery(() => db.trips.get(tripId));
+  const allTrips = useLiveQuery(() => db.trips.toArray());
   const items = useLiveQuery(() => db.items.where('tripId').equals(tripId).sortBy('date')); // Sort by date primarily
-  const [activeTab, setActiveTab] = useState<'itinerary' | 'flight' | 'car' | 'stay' | 'activity'>('itinerary');
+  const [activeTab, setActiveTab] = useState<'itinerary' | 'flight' | 'car' | 'stay' | 'activity' | 'map'>('itinerary');
   const [isModalOpen, setModalOpen] = useState(false);
   const [selectedDateForAdd, setSelectedDateForAdd] = useState<string | undefined>(undefined);
   const [generating, setGenerating] = useState(false);
@@ -625,12 +728,12 @@ export const TripDetailPage = () => {
   const filteredItems = activeTab === 'itinerary' ? items : items?.filter(i => i.type === activeTab);
 
   // Determine which type to default to when opening modal based on current tab
-  const modalDefaultType: ItemType = (activeTab !== 'itinerary' && activeTab !== 'note') ? activeTab : 'activity';
+  const modalDefaultType: ItemType = (activeTab !== 'itinerary' && activeTab !== 'note' && activeTab !== 'map') ? activeTab : 'activity';
 
   return (
     <Layout title={trip.title || trip.destination}>
       {/* Hero Section */}
-      <div className="relative rounded-[2.5rem] overflow-hidden h-64 sm:h-80 mb-8 group border-[6px] border-white dark:border-slate-800 shadow-2xl">
+      <div className="relative rounded-[2.5rem] overflow-hidden h-64 sm:h-80 mb-8 group border-[6px] border-slate-200 dark:border-slate-800 shadow-2xl">
         <img 
           src={trip.coverImage || `https://picsum.photos/seed/${trip.destination}/1000/400`} 
           alt={trip.destination} 
@@ -675,7 +778,7 @@ export const TripDetailPage = () => {
 
       {/* Navigation Tabs */}
       <div className="flex overflow-x-auto gap-3 pb-4 mb-4 no-scrollbar">
-        {(['itinerary', 'flight', 'car', 'stay', 'activity'] as const).map(tab => (
+        {(['itinerary', 'flight', 'car', 'stay', 'activity', 'map'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -685,14 +788,83 @@ export const TripDetailPage = () => {
                 : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-900 hover:bg-slate-50 dark:hover:bg-slate-700'
             }`}
           >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab === 'map' ? (
+                <span className="flex items-center gap-2"><Globe className="w-4 h-4" /> Map</span>
+            ) : (
+                tab.charAt(0).toUpperCase() + tab.slice(1)
+            )}
           </button>
         ))}
       </div>
 
       {/* Content Area */}
       <div className="pb-32">
-      {activeTab === 'itinerary' ? (
+      {activeTab === 'map' ? (
+        <Card className="p-0 overflow-hidden h-[500px] border-slate-200 dark:border-slate-700">
+             <div className="relative w-full h-full bg-slate-50 dark:bg-slate-900">
+                 <div className="absolute top-4 left-4 z-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm max-w-xs">
+                     <h3 className="text-lg font-black text-slate-900 dark:text-white mb-2">Travel Context</h3>
+                     <div className="space-y-2 text-xs font-bold uppercase tracking-wide">
+                        <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full bg-brand-500 shadow-brand-500/50 shadow-sm"></span>
+                            <span className="text-slate-600 dark:text-slate-300">Current Trip: {trip.destination}</span>
+                        </div>
+                        {allTrips && allTrips.length > 1 && (
+                            <div className="flex items-center gap-2">
+                                <span className="w-3 h-3 rounded-full bg-indigo-300 dark:bg-indigo-700"></span>
+                                <span className="text-slate-500 dark:text-slate-400">Other Trips ({allTrips.length - 1})</span>
+                            </div>
+                        )}
+                     </div>
+                 </div>
+                 <ComposableMap projection="geoMercator" projectionConfig={{ scale: 110, center: [0, 20] }} style={{ width: "100%", height: "100%" }}>
+                    <ZoomableGroup zoom={1} minZoom={0.7} maxZoom={4}>
+                      <Geographies geography={GEO_URL}>
+                        {({ geographies }) =>
+                          geographies.map((geo) => {
+                            const countryName = geo.properties.name;
+                            const isCurrent = trip.destination === countryName || countryName.includes(trip.destination) || trip.destination.includes(countryName);
+                            const isVisited = !isCurrent && allTrips?.some(t => 
+                               t.destination === countryName || 
+                               countryName.includes(t.destination) ||
+                               t.destination.includes(countryName)
+                            );
+                            
+                            return (
+                              <Geography
+                                key={geo.rsmKey}
+                                geography={geo}
+                                data-tooltip-id="detail-map-tooltip"
+                                data-tooltip-content={countryName}
+                                fill={isCurrent ? "#0ea5e9" : isVisited ? "#818cf8" : "var(--map-default)"}
+                                stroke="var(--map-stroke)"
+                                strokeWidth={0.5}
+                                style={{
+                                  default: { 
+                                      fill: isCurrent ? "#0ea5e9" : isVisited ? "#6366f1" : "#cbd5e1", 
+                                      outline: "none", 
+                                      transition: "all 0.3s",
+                                      filter: isCurrent ? "drop-shadow(0 0 8px rgba(14,165,233,0.4))" : "none"
+                                  },
+                                  hover: { 
+                                      fill: isCurrent ? "#0284c7" : isVisited ? "#4f46e5" : "#94a3b8", 
+                                      outline: "none", 
+                                      cursor: "pointer" 
+                                  },
+                                  pressed: { fill: "#0284c7", outline: "none" }
+                                }}
+                                className="transition-colors duration-300"
+                              />
+                            );
+                          })
+                        }
+                      </Geographies>
+                    </ZoomableGroup>
+                 </ComposableMap>
+                 <Tooltip id="detail-map-tooltip" className="z-50 !bg-slate-900 !text-white !font-bold !rounded-xl !text-xs !py-1 !px-3" />
+             </div>
+        </Card>
+      ) : activeTab === 'itinerary' ? (
         <div className="space-y-10">
           {days.map((day, index) => {
             const dayItems = items?.filter(i => i.date === day);
@@ -761,124 +933,5 @@ export const TripDetailPage = () => {
         initialType={modalDefaultType}
       />
     </Layout>
-  );
-};
-
-// --- Display Card ---
-const TripItemCard: React.FC<{ item: TripItem }> = ({ item }) => {
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if(confirm('Delete this item?')) db.items.delete(item.id!);
-  };
-
-  const toggleComplete = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    await db.items.update(item.id!, { completed: !item.completed });
-  };
-
-  return (
-    <Card className={`group flex flex-col p-0 ${item.completed ? 'opacity-50 grayscale' : ''}`}>
-      <div className="flex p-5 gap-4">
-        {/* Image / Icon Section */}
-        {item.imageUrl ? (
-           <div className="relative w-24 h-24 shrink-0">
-              <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover rounded-2xl shadow-sm bg-slate-100" />
-              <div className={`absolute -bottom-2 -right-2 p-1.5 rounded-lg shadow-sm border border-white dark:border-slate-800 ${
-                 item.type === 'flight' ? 'bg-sky-100 text-sky-700' : 
-                 item.type === 'stay' ? 'bg-indigo-100 text-indigo-700' : 
-                 item.type === 'car' ? 'bg-orange-100 text-orange-700' : 
-                 'bg-emerald-100 text-emerald-700'
-              }`}>
-                  <CategoryIcon type={item.type} className="w-4 h-4" />
-              </div>
-           </div>
-        ) : (
-           <div className={`w-14 h-14 shrink-0 rounded-2xl shadow-inner flex items-center justify-center self-start ${
-            item.type === 'flight' ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-400' : 
-            item.type === 'stay' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-400' : 
-            item.type === 'car' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-400' : 
-            'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400'
-          }`}>
-            <CategoryIcon type={item.type} className="w-8 h-8" />
-          </div>
-        )}
-
-        <div className="flex-1 min-w-0">
-            <div className="flex justify-between items-start mb-1">
-               <h4 className={`text-lg font-black text-slate-800 dark:text-slate-100 leading-tight line-clamp-2 ${item.completed ? 'line-through decoration-slate-400 decoration-2' : ''}`}>{item.title}</h4>
-               
-               <div className="flex gap-1 ml-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={toggleComplete} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-green-600 transition-colors">
-                    <Check className="w-4 h-4" />
-                  </button>
-                  <button onClick={handleDelete} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg text-slate-400 hover:text-red-600 transition-colors">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-               </div>
-            </div>
-
-            {/* Tags / Booking Ref */}
-            <div className="flex flex-wrap gap-2 mb-2">
-                {item.bookingRef && <span className="text-xs font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-500">#{item.bookingRef}</span>}
-                {item.bookingLink && (
-                    <a href={item.bookingLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs font-bold text-brand-600 hover:underline bg-brand-50 px-2 py-0.5 rounded">
-                        Book <ExternalLink className="w-3 h-3" />
-                    </a>
-                )}
-            </div>
-            
-            {/* Specific Details */}
-             {item.type === 'flight' && (item.departureAirport || item.arrivalAirport) && (
-                <div className="flex items-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-300">
-                    {item.departureAirport} <span className="text-slate-400">→</span> {item.arrivalAirport}
-                </div>
-            )}
-            
-            {/* Car Rental Specific Display */}
-             {item.type === 'car' && (
-                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                    <div className="bg-slate-50 dark:bg-slate-700/30 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
-                        <div className="text-[10px] font-black uppercase text-slate-400 mb-1">Pick-up</div>
-                        <div className="font-bold text-slate-700 dark:text-slate-200 line-clamp-1" title={item.pickupLocation}>{item.pickupLocation || 'No Location'}</div>
-                        <div className="text-xs text-slate-500 font-medium mt-0.5">{new Date(item.date).toLocaleDateString(undefined, {month:'short', day:'numeric'})} • {item.startTime}</div>
-                    </div>
-                    {(item.dropoffLocation || item.endDate) && (
-                        <div className="bg-slate-50 dark:bg-slate-700/30 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
-                            <div className="text-[10px] font-black uppercase text-slate-400 mb-1">Drop-off</div>
-                            <div className="font-bold text-slate-700 dark:text-slate-200 line-clamp-1" title={item.dropoffLocation}>{item.dropoffLocation || item.pickupLocation}</div>
-                            {item.endDate && <div className="text-xs text-slate-500 font-medium mt-0.5">{new Date(item.endDate).toLocaleDateString(undefined, {month:'short', day:'numeric'})} • {item.endTime}</div>}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {item.details && <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 font-medium leading-relaxed">{item.details}</p>}
-        </div>
-      </div>
-
-      {/* Footer Info */}
-      <div className="bg-slate-50/80 dark:bg-slate-800/80 px-5 py-3 border-t border-slate-100 dark:border-slate-700/50 flex flex-wrap gap-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-        {item.startTime && (
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-slate-400" />
-            {item.startTime}
-            {item.endTime && item.type === 'flight' && <span className="text-slate-300 mx-1">→</span>}
-            {item.endTime && item.type === 'flight' && item.endTime}
-          </div>
-        )}
-        {item.location && item.type !== 'car' && (
-          <div className="flex items-center gap-1.5 truncate max-w-[150px]">
-            <MapPin className="w-3.5 h-3.5 text-slate-400" />
-            {item.location}
-          </div>
-        )}
-        {item.cost && (
-          <div className="flex items-center gap-1.5 ml-auto text-brand-600 dark:text-brand-400">
-            <DollarSign className="w-3.5 h-3.5" />
-            {item.cost}
-          </div>
-        )}
-      </div>
-    </Card>
   );
 };

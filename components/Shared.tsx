@@ -14,7 +14,7 @@ export const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttrib
     
     const variants = {
       primary: "bg-[#0ea5e9] border-[#0369a1] text-white shadow-[0_8px_20px_rgba(14,165,233,0.3)] hover:brightness-110",
-      secondary: "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-950 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700",
+      secondary: "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700",
       danger: "bg-[#ef4444] border-[#991b1b] text-white shadow-[0_8px_20px_rgba(239,68,68,0.3)] hover:brightness-110",
       ghost: "bg-transparent text-slate-500 dark:text-slate-400 border-transparent shadow-none hover:bg-slate-100 dark:hover:bg-slate-800 !border-b-0 !translate-y-0 !mt-0 active:scale-95"
     };
@@ -42,7 +42,7 @@ export const NavButton = ({ icon: Icon, onClick, label, color }: { icon: any, on
   return (
     <button
       onClick={onClick}
-      className={`group relative flex items-center justify-center w-12 h-12 rounded-2xl transition-all duration-200 hover:scale-110 active:scale-95 bg-white dark:bg-slate-800 shadow-md border-b-4 border-slate-200 dark:border-slate-950 text-slate-600 dark:text-slate-300 hover:text-brand-500 dark:hover:text-brand-400 active:border-b-0 active:translate-y-1`}
+      className={`group relative flex items-center justify-center w-12 h-12 rounded-2xl transition-all duration-200 hover:scale-110 active:scale-95 bg-white dark:bg-slate-800 shadow-md border-b-[4px] border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-brand-500 dark:hover:text-brand-400 active:border-b-0 active:translate-y-1`}
       title={label}
     >
       <Icon className="w-6 h-6" strokeWidth={2.5} />
@@ -111,7 +111,7 @@ export const Input = React.forwardRef<HTMLInputElement | HTMLTextAreaElement, Re
            )}
            
            <div className="flex-1 relative">
-             <div className="absolute inset-0 bg-slate-100 dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-inner pointer-events-none" />
+             <div className="absolute inset-0 bg-slate-100 dark:bg-slate-800 rounded-2xl border-[3px] border-slate-300 dark:border-slate-700 shadow-inner pointer-events-none" />
              {multiline ? (
                 <textarea
                    ref={inputRef as React.RefObject<HTMLTextAreaElement>}
@@ -205,7 +205,7 @@ export const TimeInput: React.FC<TimeInputProps> = ({
            <ThreeDIcon icon={Icon} color={iconColor} onClick={() => setIsOpen(true)} />
            
            <div onClick={() => setIsOpen(true)} className="flex-1 relative cursor-pointer group">
-             <div className="absolute inset-0 bg-slate-100 dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-inner pointer-events-none group-hover:border-brand-300 transition-colors" />
+             <div className="absolute inset-0 bg-slate-100 dark:bg-slate-800 rounded-2xl border-[3px] border-slate-300 dark:border-slate-700 shadow-inner pointer-events-none group-hover:border-brand-300 transition-colors" />
              <div className={`relative z-10 w-full bg-transparent text-slate-800 dark:text-slate-100 text-xl font-bold px-5 h-[4.5rem] flex items-center ${className || ''}`}>
                 {value || '--:--'}
              </div>
@@ -296,7 +296,7 @@ export const DateInput: React.FC<DateInputProps> = ({
     // Custom Input component for react-datepicker to match our 3D design
     const CustomInput = React.forwardRef(({ value, onClick }: any, ref: any) => (
         <div className="flex-1 relative cursor-pointer group" onClick={onClick}>
-            <div className="absolute inset-0 bg-slate-100 dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-inner pointer-events-none group-hover:border-brand-300 transition-colors" />
+            <div className="absolute inset-0 bg-slate-100 dark:bg-slate-800 rounded-2xl border-[3px] border-slate-300 dark:border-slate-700 shadow-inner pointer-events-none group-hover:border-brand-300 transition-colors" />
             <input
                 ref={ref}
                 readOnly
@@ -352,7 +352,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         <div className="flex items-center gap-3">
           {Icon && <ThreeDIcon icon={Icon} color={iconColor} />}
           <div className="flex-1 relative group">
-            <div className="absolute inset-0 bg-slate-100 dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-inner pointer-events-none" />
+            <div className="absolute inset-0 bg-slate-100 dark:bg-slate-800 rounded-2xl border-[3px] border-slate-300 dark:border-slate-700 shadow-inner pointer-events-none" />
             <select
               ref={ref}
               className={`relative z-10 w-full bg-transparent text-slate-800 dark:text-slate-100 text-xl font-bold px-5 h-[4.5rem] outline-none appearance-none cursor-pointer ${className}`}
@@ -407,7 +407,7 @@ export const ChipGroup = ({ label, options, selected, onChange }: ChipGroupProps
                className={`px-5 py-3 rounded-xl font-bold text-sm transition-all border-b-[4px] active:border-b-0 active:translate-y-[4px] ${
                  isSelected 
                   ? 'bg-brand-500 border-brand-700 text-white shadow-brand-500/30 shadow-lg translate-y-[-2px]' 
-                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50'
+                  : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50'
                }`}
              >
                {opt}
@@ -420,7 +420,7 @@ export const ChipGroup = ({ label, options, selected, onChange }: ChipGroupProps
 };
 
 export const Card: React.FC<{ children?: React.ReactNode; className?: string; onClick?: () => void }> = ({ children, className, onClick }) => (
-  <div onClick={onClick} className={`relative bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-800 border-b-[6px] shadow-lg overflow-hidden ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-xl transition-all duration-300 active:border-b-2 active:translate-y-1' : ''} ${className || ''}`}>
+  <div onClick={onClick} className={`relative bg-white dark:bg-slate-800 rounded-[2rem] border-[3px] border-slate-300 dark:border-slate-600 border-b-[6px] shadow-lg overflow-hidden ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-2xl hover:border-brand-400 dark:hover:border-brand-600 transition-all duration-300 active:border-b-[3px] active:translate-y-1' : ''} ${className || ''}`}>
     {children}
   </div>
 );
@@ -469,10 +469,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, title }) => {
   const toggleTheme = () => setIsDark(!isDark);
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-slate-950 transition-colors duration-300 pb-10 font-sans">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors duration-300 pb-10 font-sans">
       {/* Sticky Top Nav */}
       <header className="sticky top-4 z-50 mx-auto w-[96%] max-w-6xl">
-        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[2rem] border-2 border-white dark:border-slate-800 shadow-xl p-3 pl-6 pr-3 flex items-center justify-between">
+        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[2rem] border-[3px] border-slate-200 dark:border-slate-800 shadow-xl p-3 pl-6 pr-3 flex items-center justify-between">
           
           {/* Title on Left */}
           <div className="flex items-center gap-3">

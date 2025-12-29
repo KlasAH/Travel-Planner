@@ -1,10 +1,11 @@
 
-import React, { useState, useRef } from 'react';
+
+import React, { useState, useRef, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../db';
 import { Layout, Button, Card, Input, Select, ChipGroup, DateInput } from '../components/Shared';
-import { Plus, Calendar, MapPin, ChevronRight, Trash2, Globe, Tag, Sparkles } from 'lucide-react';
+import { Plus, Calendar, MapPin, ChevronRight, Trash2, Globe, Tag, Sparkles, Filter } from 'lucide-react';
 import { Trip } from '../types';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import { Tooltip } from "react-tooltip";
@@ -213,8 +214,10 @@ const INTERESTS = ['Food 🍜', 'Hiking 🥾', 'History 🏛️', 'Relaxing 🧖
 
 export const TripListPage = () => {
   const navigate = useNavigate();
-  const trips = useLiveQuery(() => db.trips.toArray());
+  // Changed query to order by date descending for better "Many Trips" handling
+  const trips = useLiveQuery(() => db.trips.orderBy('startDate').reverse().toArray());
   const [isModalOpen, setModalOpen] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<number | 'ALL'>('ALL');
 
   // New Trip State
   const [newTrip, setNewTrip] = useState<Partial<Trip>>({
@@ -224,6 +227,21 @@ export const TripListPage = () => {
     endDate: '',
     tags: []
   });
+
+  // Calculate distinct years from trips
+  const years = useMemo(() => {
+    if (!trips) return [];
+    // Safely parse the year from YYYY-MM-DD
+    const uniqueYears = new Set(trips.map(t => parseInt(t.startDate.split('-')[0])));
+    return Array.from(uniqueYears).sort((a: number, b: number) => b - a);
+  }, [trips]);
+
+  // Filter trips based on selection
+  const filteredTrips = useMemo(() => {
+    if (!trips) return [];
+    if (selectedYear === 'ALL') return trips;
+    return trips.filter(t => parseInt(t.startDate.split('-')[0]) === selectedYear);
+  }, [trips, selectedYear]);
 
   const handleStartDateChange = (date: string) => {
      if (!date) {
@@ -278,17 +296,27 @@ export const TripListPage = () => {
     }
   };
 
+  const getDurationDays = (start: string, end: string) => {
+    const s = new Date(start);
+    const e = new Date(end);
+    const diffTime = Math.abs(e.getTime() - s.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; 
+    return diffDays;
+  };
+
   return (
     <Layout title="My Trips">
        {/* World Map Visualization */}
-       <div className="mb-10 bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl border-[6px] border-slate-100 dark:border-slate-800 overflow-hidden relative group">
+       <div className="mb-8 bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl border-[6px] border-slate-300 dark:border-slate-700 overflow-hidden relative group">
           <div className="absolute top-6 left-8 z-10 pointer-events-none">
              <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                 <h2 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
                   <Globe className="w-5 h-5 text-brand-500" />
                   Travel Map
                 </h2>
-                <p className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{trips?.length || 0} Trips Planned</p>
+                <p className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                   {selectedYear === 'ALL' ? 'All Time' : selectedYear} • {filteredTrips?.length || 0} Trips
+                </p>
              </div>
           </div>
           
@@ -298,9 +326,8 @@ export const TripListPage = () => {
                   <Geographies geography={GEO_URL}>
                     {({ geographies }) =>
                       geographies.map((geo) => {
-                        // Check if this country is in our trips
-                        // We use "includes" to be lenient (e.g., "United States" matches "United States of America")
-                        const isVisited = trips?.some(t => 
+                        // Check if this country is in our FILTERED trips
+                        const isVisited = filteredTrips?.some(t => 
                            t.destination === geo.properties.name || 
                            geo.properties.name.includes(t.destination) ||
                            t.destination.includes(geo.properties.name)
@@ -332,10 +359,44 @@ export const TripListPage = () => {
           <Tooltip id="map-tooltip" className="z-50 !bg-slate-900 !text-white !font-bold !rounded-xl !text-xs !py-1 !px-3" />
        </div>
 
+      {/* Year Filter Tabs */}
+      {years.length > 0 && (
+          <div className="flex items-center gap-3 overflow-x-auto pb-2 mb-6 no-scrollbar">
+             <div className="flex items-center gap-2 px-3 text-slate-400">
+               <Filter className="w-5 h-5" />
+             </div>
+             <button
+                onClick={() => setSelectedYear('ALL')}
+                className={`px-5 py-2 rounded-xl font-black text-sm uppercase tracking-wide transition-all border-b-[3px] active:scale-95 whitespace-nowrap ${
+                    selectedYear === 'ALL' 
+                    ? 'bg-slate-800 text-white border-slate-950 dark:bg-white dark:text-slate-900 dark:border-slate-300' 
+                    : 'bg-white text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700 hover:bg-slate-50'
+                }`}
+             >
+                All Years
+             </button>
+             {years.map(year => (
+                <button
+                   key={year}
+                   onClick={() => setSelectedYear(year)}
+                   className={`px-5 py-2 rounded-xl font-black text-sm uppercase tracking-wide transition-all border-b-[3px] active:scale-95 ${
+                       selectedYear === year
+                       ? 'bg-brand-500 text-white border-brand-700 shadow-lg shadow-brand-500/30'
+                       : 'bg-white text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700 hover:bg-slate-50'
+                   }`}
+                >
+                   {year}
+                </button>
+             ))}
+          </div>
+      )}
+
       {trips && trips.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pb-32">
-          {trips.map(trip => (
-            <Card key={trip.id} onClick={() => navigate(`/trip/${trip.id}`)} className="group flex flex-col h-full">
+          {filteredTrips.map(trip => {
+            const duration = getDurationDays(trip.startDate, trip.endDate);
+            return (
+            <Card key={trip.id} onClick={() => navigate(`/trip/${trip.id}`)} className="group flex flex-col h-full animate-in fade-in zoom-in duration-300">
               <div className="h-48 overflow-hidden relative border-b-4 border-slate-100 dark:border-slate-800">
                 <img 
                   src={trip.coverImage} 
@@ -350,9 +411,12 @@ export const TripListPage = () => {
                 </div>
               </div>
               <div className="p-6 flex-1 flex flex-col bg-white dark:bg-slate-800">
-                <div className="flex items-center text-slate-500 dark:text-slate-400 text-sm mb-4 font-bold uppercase tracking-wider">
-                  <Calendar className="w-4 h-4 mr-2 text-brand-500" />
-                  <span>{new Date(trip.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} — {new Date(trip.endDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                <div className="flex items-center text-slate-500 dark:text-slate-400 text-sm mb-4 font-bold uppercase tracking-wider justify-between">
+                  <div className="flex items-center">
+                    <Calendar className="w-4 h-4 mr-2 text-brand-500" />
+                    <span>{new Date(trip.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} — {new Date(trip.endDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  </div>
+                   <span className="bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-lg text-[0.65rem] text-slate-500 dark:text-slate-300">{duration} Days</span>
                 </div>
                 
                 {trip.tags && trip.tags.length > 0 && (
@@ -377,12 +441,19 @@ export const TripListPage = () => {
                 </div>
               </div>
             </Card>
-          ))}
+          )})}
+
+          {filteredTrips.length === 0 && selectedYear !== 'ALL' && (
+             <div className="col-span-full py-10 flex flex-col items-center justify-center text-slate-400">
+                <h3 className="text-xl font-black text-slate-300 dark:text-slate-600 uppercase">No trips in {selectedYear}</h3>
+                <p className="text-sm font-bold">Time to plan one?</p>
+             </div>
+          )}
           
-          {/* Add New Trip Card */}
+          {/* Add New Trip Card - Always visible or usually relevant */}
           <button 
              onClick={() => setModalOpen(true)}
-             className="group relative flex flex-col items-center justify-center h-full min-h-[350px] rounded-[2rem] border-4 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 hover:border-brand-400 dark:hover:border-brand-500 hover:bg-brand-50/50 dark:hover:bg-slate-800 transition-all duration-300"
+             className="group relative flex flex-col items-center justify-center h-full min-h-[350px] rounded-[2rem] border-[4px] border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 hover:border-brand-400 dark:hover:border-brand-500 hover:bg-brand-50/50 dark:hover:bg-slate-800 transition-all duration-300"
           >
              <div className="w-24 h-24 rounded-3xl bg-white dark:bg-slate-800 text-slate-300 group-hover:text-brand-500 flex items-center justify-center transition-all duration-300 shadow-sm group-hover:shadow-2xl group-hover:scale-110 mb-6 group-hover:-rotate-6 border-4 border-slate-100 dark:border-slate-700">
                 <Plus className="w-12 h-12" strokeWidth={4} />
@@ -449,7 +520,7 @@ export const TripListPage = () => {
                     options={COUNTRIES}
                   />
                   
-                  {/* Dates Row - CHANGED to vertical stack */}
+                  {/* Dates Row */}
                   <div className="grid grid-cols-1 gap-6">
                     <DateInput 
                       label="Start Date" 
