@@ -1,10 +1,9 @@
-
 import React, { useState, useRef, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../db';
 import { Layout, Button, Card, Input, Select, ChipGroup, DateInput } from '../components/Shared';
-import { Plus, Calendar, MapPin, ChevronRight, Trash2, Globe, Tag, Sparkles, Filter, DownloadCloud } from 'lucide-react';
+import { Plus, Calendar, MapPin, ChevronRight, Trash2, Globe, Tag, Sparkles, Filter, DownloadCloud, Clock, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { Trip, SharedTripData } from '../types';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import { Tooltip } from "react-tooltip";
@@ -213,10 +212,14 @@ const INTERESTS = ['Food 🍜', 'Hiking 🥾', 'History 🏛️', 'Relaxing 🧖
 
 export const TripListPage = () => {
   const navigate = useNavigate();
-  // Changed query to order by date descending for better "Many Trips" handling
-  const trips = useLiveQuery(() => db.trips.orderBy('startDate').reverse().toArray());
+  // We use toArray() here to get all trips, then filter/sort in memory.
+  // For standard IndexedDB usage this is efficient enough for typical personal usage (up to thousands of records).
+  const trips = useLiveQuery(() => db.trips.toArray());
   const [isModalOpen, setModalOpen] = useState(false);
   const [selectedYear, setSelectedYear] = useState<number | 'ALL'>('ALL');
+  
+  // Sort State
+  const [sortOption, setSortOption] = useState<'date-desc' | 'date-asc' | 'len-desc' | 'len-asc' | 'alpha'>('date-desc');
 
   // New Trip State
   const [newTrip, setNewTrip] = useState<Partial<Trip>>({
@@ -226,6 +229,9 @@ export const TripListPage = () => {
     endDate: '',
     tags: []
   });
+  
+  // Trip Duration State for Creation
+  const [duration, setDuration] = useState<number>(7);
 
   // Calculate distinct years from trips
   const years = useMemo(() => {
@@ -235,12 +241,57 @@ export const TripListPage = () => {
     return Array.from(uniqueYears).sort((a: number, b: number) => b - a);
   }, [trips]);
 
-  // Filter trips based on selection
-  const filteredTrips = useMemo(() => {
+  // Helpers to sync Date & Duration
+  const calculateEndDate = (start: string, days: number) => {
+     if (!start) return '';
+     const d = new Date(start);
+     d.setDate(d.getDate() + (days - 1)); // Inclusive calculation
+     return d.toISOString().split('T')[0];
+  };
+
+  const calculateDuration = (start: string, end: string) => {
+     if (!start || !end) return 1;
+     const s = new Date(start);
+     const e = new Date(end);
+     const diffTime = e.getTime() - s.getTime();
+     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Inclusive
+     return diffDays > 0 ? diffDays : 1;
+  };
+  
+  // Duration helper for Sorting/Display
+  const getDurationDays = (start: string, end: string) => {
+    const s = new Date(start);
+    const e = new Date(end);
+    const diffTime = e.getTime() - s.getTime(); // Not using Abs to keep logic consistent
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; 
+    return diffDays > 0 ? diffDays : 1;
+  };
+
+  // Filter and Sort trips
+  const processedTrips = useMemo(() => {
     if (!trips) return [];
-    if (selectedYear === 'ALL') return trips;
-    return trips.filter(t => parseInt(t.startDate.split('-')[0]) === selectedYear);
-  }, [trips, selectedYear]);
+    
+    // 1. Filter
+    let filtered = selectedYear === 'ALL' ? trips : trips.filter(t => parseInt(t.startDate.split('-')[0]) === selectedYear);
+    
+    // 2. Sort
+    return filtered.sort((a, b) => {
+        switch (sortOption) {
+            case 'date-desc':
+                return b.startDate.localeCompare(a.startDate);
+            case 'date-asc':
+                return a.startDate.localeCompare(b.startDate);
+            case 'len-desc':
+                return getDurationDays(b.startDate, b.endDate) - getDurationDays(a.startDate, a.endDate);
+            case 'len-asc':
+                return getDurationDays(a.startDate, a.endDate) - getDurationDays(b.startDate, b.endDate);
+            case 'alpha':
+                return (a.title || a.destination).localeCompare(b.title || b.destination);
+            default:
+                return 0;
+        }
+    });
+  }, [trips, selectedYear, sortOption]);
 
   const handleStartDateChange = (date: string) => {
      if (!date) {
@@ -248,17 +299,29 @@ export const TripListPage = () => {
         return;
      }
 
-     // Automatically set end date to start date + 7 days
-     const start = new Date(date);
-     const end = new Date(start);
-     end.setDate(start.getDate() + 7);
-     const endDateStr = end.toISOString().split('T')[0];
-
+     const endDateStr = calculateEndDate(date, duration);
      setNewTrip(prev => ({ 
          ...prev, 
          startDate: date,
          endDate: endDateStr 
      }));
+  };
+  
+  const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const days = parseInt(e.target.value) || 1;
+      setDuration(days);
+      if (newTrip.startDate) {
+          const endDate = calculateEndDate(newTrip.startDate, days);
+          setNewTrip(prev => ({ ...prev, endDate }));
+      }
+  };
+
+  const handleEndDateChange = (date: string) => {
+      if (newTrip.startDate && date) {
+          const days = calculateDuration(newTrip.startDate, date);
+          setDuration(days);
+      }
+      setNewTrip(prev => ({ ...prev, endDate: date }));
   };
 
   const handleCreateTrip = async (e: React.FormEvent) => {
@@ -282,6 +345,7 @@ export const TripListPage = () => {
 
     setModalOpen(false);
     setNewTrip({ title: '', destination: '', startDate: '', endDate: '', tags: [] });
+    setDuration(7);
     navigate(`/trip/${tripId}`);
   };
 
@@ -295,14 +359,6 @@ export const TripListPage = () => {
     }
   };
 
-  const getDurationDays = (start: string, end: string) => {
-    const s = new Date(start);
-    const e = new Date(end);
-    const diffTime = Math.abs(e.getTime() - s.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; 
-    return diffDays;
-  };
-
   return (
     <Layout title="My Trips">
        {/* World Map Visualization */}
@@ -314,7 +370,7 @@ export const TripListPage = () => {
                   Travel Map
                 </h2>
                 <p className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                   {selectedYear === 'ALL' ? 'All Time' : selectedYear} • {filteredTrips?.length || 0} Trips
+                   {selectedYear === 'ALL' ? 'All Time' : selectedYear} • {processedTrips?.length || 0} Trips
                 </p>
              </div>
           </div>
@@ -326,7 +382,7 @@ export const TripListPage = () => {
                     {({ geographies }) =>
                       geographies.map((geo) => {
                         // Check if this country is in our FILTERED trips
-                        const isVisited = filteredTrips?.some(t => 
+                        const isVisited = processedTrips?.some(t => 
                            t.destination === geo.properties.name || 
                            geo.properties.name.includes(t.destination) ||
                            t.destination.includes(geo.properties.name)
@@ -358,41 +414,61 @@ export const TripListPage = () => {
           <Tooltip id="map-tooltip" className="z-50 !bg-slate-900 !text-white !font-bold !rounded-xl !text-xs !py-1 !px-3" />
        </div>
 
-      {/* Year Filter Tabs */}
-      {years.length > 0 && (
-          <div className="flex items-center gap-3 overflow-x-auto pb-2 mb-6 no-scrollbar">
-             <div className="flex items-center gap-2 px-3 text-slate-400">
-               <Filter className="w-5 h-5" />
-             </div>
-             <button
-                onClick={() => setSelectedYear('ALL')}
-                className={`px-5 py-2 rounded-xl font-black text-sm uppercase tracking-wide transition-all border-b-[3px] active:scale-95 whitespace-nowrap ${
-                    selectedYear === 'ALL' 
-                    ? 'bg-slate-800 text-white border-slate-950 dark:bg-white dark:text-slate-900 dark:border-slate-300' 
-                    : 'bg-white text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700 hover:bg-slate-50'
-                }`}
-             >
-                All Years
-             </button>
-             {years.map(year => (
-                <button
-                   key={year}
-                   onClick={() => setSelectedYear(year)}
-                   className={`px-5 py-2 rounded-xl font-black text-sm uppercase tracking-wide transition-all border-b-[3px] active:scale-95 ${
-                       selectedYear === year
-                       ? 'bg-brand-500 text-white border-brand-700 shadow-lg shadow-brand-500/30'
-                       : 'bg-white text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700 hover:bg-slate-50'
-                   }`}
-                >
-                   {year}
-                </button>
-             ))}
+      {/* Filter & Sort Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
+          {/* Year Filter */}
+          {years.length > 0 && (
+              <div className="flex items-center gap-3 overflow-x-auto pb-2 no-scrollbar flex-1">
+                 <div className="flex items-center gap-2 px-3 text-slate-400">
+                   <Filter className="w-5 h-5" />
+                 </div>
+                 <button
+                    onClick={() => setSelectedYear('ALL')}
+                    className={`px-5 py-2 rounded-xl font-black text-sm uppercase tracking-wide transition-all border-b-[3px] active:scale-95 whitespace-nowrap ${
+                        selectedYear === 'ALL' 
+                        ? 'bg-slate-800 text-white border-slate-950 dark:bg-white dark:text-slate-900 dark:border-slate-300' 
+                        : 'bg-white text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700 hover:bg-slate-50'
+                    }`}
+                 >
+                    All Years
+                 </button>
+                 {years.map(year => (
+                    <button
+                       key={year}
+                       onClick={() => setSelectedYear(year)}
+                       className={`px-5 py-2 rounded-xl font-black text-sm uppercase tracking-wide transition-all border-b-[3px] active:scale-95 ${
+                           selectedYear === year
+                           ? 'bg-brand-500 text-white border-brand-700 shadow-lg shadow-brand-500/30'
+                           : 'bg-white text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700 hover:bg-slate-50'
+                       }`}
+                    >
+                       {year}
+                    </button>
+                 ))}
+              </div>
+          )}
+          
+          {/* Sort Control */}
+          <div className="relative">
+              <select 
+                value={sortOption} 
+                onChange={(e) => setSortOption(e.target.value as any)}
+                className="appearance-none bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 pl-10 pr-10 py-2 rounded-xl font-bold text-sm outline-none cursor-pointer focus:border-brand-500 dark:focus:border-brand-500"
+              >
+                  <option value="date-desc">Newest First</option>
+                  <option value="date-asc">Oldest First</option>
+                  <option value="len-desc">Duration (Longest)</option>
+                  <option value="len-asc">Duration (Shortest)</option>
+                  <option value="alpha">Name (A-Z)</option>
+              </select>
+              <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" strokeWidth={3} />
           </div>
-      )}
+      </div>
 
       {trips && trips.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pb-32">
-          {filteredTrips.map(trip => {
+          {processedTrips.map(trip => {
             const duration = getDurationDays(trip.startDate, trip.endDate);
             return (
             <Card key={trip.id} onClick={() => navigate(`/trip/${trip.id}`)} className="group flex flex-col h-full animate-in fade-in zoom-in duration-300">
@@ -442,7 +518,7 @@ export const TripListPage = () => {
             </Card>
           )})}
 
-          {filteredTrips.length === 0 && selectedYear !== 'ALL' && (
+          {processedTrips.length === 0 && selectedYear !== 'ALL' && (
              <div className="col-span-full py-10 flex flex-col items-center justify-center text-slate-400">
                 <h3 className="text-xl font-black text-slate-300 dark:text-slate-600 uppercase">No trips in {selectedYear}</h3>
                 <p className="text-sm font-bold">Time to plan one?</p>
@@ -520,7 +596,7 @@ export const TripListPage = () => {
                   />
                   
                   {/* Dates Row */}
-                  <div className="grid grid-cols-1 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
                     <DateInput 
                       label="Start Date" 
                       value={newTrip.startDate || ''} 
@@ -530,10 +606,21 @@ export const TripListPage = () => {
                       iconColor="green"
                       className="cursor-pointer"
                     />
+                    
+                    <Input 
+                        label="Duration (Days)"
+                        type="number"
+                        min={1}
+                        value={duration}
+                        onChange={handleDurationChange}
+                        icon={Clock}
+                        iconColor="orange"
+                    />
+
                     <DateInput 
                       label="End Date" 
                       value={newTrip.endDate || ''} 
-                      onChange={val => setNewTrip({...newTrip, endDate: val})} 
+                      onChange={handleEndDateChange} 
                       required 
                       icon={Calendar}
                       iconColor="red"

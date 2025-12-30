@@ -280,15 +280,21 @@ interface DateInputProps {
     placeholder?: string;
     required?: boolean;
     className?: string;
+    min?: string; // YYYY-MM-DD
+    max?: string; // YYYY-MM-DD
 }
 
 export const DateInput: React.FC<DateInputProps> = ({ 
-    value, onChange, label, icon: Icon = CalendarIcon, iconColor = 'blue', placeholder = "Select date", className 
+    value, onChange, label, icon: Icon = CalendarIcon, iconColor = 'blue', placeholder = "Select date", className, min, max
 }) => {
     
     // Convert YYYY-MM-DD string to Date object
     // Append T12:00:00 to prevent timezone issues shifting the day
     const dateValue = value ? new Date(value + 'T12:00:00') : null;
+
+    // Convert min/max strings to Date objects if provided
+    const minDate = min ? new Date(min + 'T00:00:00') : undefined;
+    const maxDate = max ? new Date(max + 'T00:00:00') : undefined;
 
     const handleDateChange = (date: Date | null) => {
         if (!date) {
@@ -338,6 +344,8 @@ export const DateInput: React.FC<DateInputProps> = ({
                         showMonthDropdown
                         showYearDropdown
                         dropdownMode="select"
+                        minDate={minDate}
+                        maxDate={maxDate}
                     />
                  </div>
             </div>
