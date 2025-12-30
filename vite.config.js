@@ -11,8 +11,8 @@ export default defineConfig(({ mode }) => {
     return {
       server: {
         port: 3000,
-        host: '0.0.0.0',
-        allowedHosts: true,
+        host: '0.0.0.0', // Listen on all local IPs
+        // allowedHosts: true, // Removed to ensure compatibility with all Vite versions
       },
       plugins: [react()],
       resolve: {

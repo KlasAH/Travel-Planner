@@ -274,8 +274,8 @@ export const TripListPage = () => {
     // 1. Filter
     let filtered = selectedYear === 'ALL' ? trips : trips.filter(t => parseInt(t.startDate.split('-')[0]) === selectedYear);
     
-    // 2. Sort
-    return filtered.sort((a, b) => {
+    // 2. Sort (CRITICAL FIX: Create copy before sorting to avoid mutating read-only array from Dexie)
+    return [...filtered].sort((a, b) => {
         switch (sortOption) {
             case 'date-desc':
                 return b.startDate.localeCompare(a.startDate);
