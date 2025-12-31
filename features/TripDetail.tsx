@@ -1,10 +1,11 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { Trip, TripItem, ItemType, SharedTripData } from '../types';
-import { Layout, Button, Card, CategoryIcon, Input, Fab, DateInput, TimeInput, Select } from '../components/Shared';
-import { Plus, Trash2, Calendar, MapPin, Clock, DollarSign, Check, Wand2, Tag, AlignLeft, Hash, Plane, Key, Home, Car, X, Link as LinkIcon, ExternalLink, ArrowRight, Globe, ChevronRight, Share2, Copy, ImageIcon, AlertTriangle, Upload, Edit, Save } from 'lucide-react';
+import { Layout, Button, Card, CategoryIcon, Input, Fab, DateInput, TimeInput } from '../components/Shared';
+import { Plus, Trash2, Calendar, MapPin, Clock, DollarSign, Check, Wand2, Tag, AlignLeft, Hash, Plane, Key, Home, Car, X, Link as LinkIcon, ExternalLink, ArrowRight, Globe, ChevronRight, Share2, Copy, ImageIcon, AlertTriangle, Upload } from 'lucide-react';
 import { generateItinerary, Suggestion } from '../services/geminiService';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import { Tooltip } from "react-tooltip";
@@ -24,153 +25,8 @@ const getDaysArray = (start: string, end: string) => {
   return arr;
 };
 
-// --- Edit Trip Modal ---
-const EditTripModal = ({ trip, isOpen, onClose }: { trip: Trip, isOpen: boolean, onClose: () => void }) => {
-    const [formData, setFormData] = useState<Partial<Trip>>({ ...trip });
-    const [duration, setDuration] = useState<number>(1);
-
-    useEffect(() => {
-        if(isOpen && trip) {
-            setFormData({...trip});
-            if (trip.startDate && trip.endDate) {
-                 const s = new Date(trip.startDate);
-                 const e = new Date(trip.endDate);
-                 const diffTime = e.getTime() - s.getTime();
-                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-                 setDuration(diffDays > 0 ? diffDays : 1);
-            }
-        }
-    }, [isOpen, trip]);
-
-    // Helpers to sync Date & Duration (Same as in TripList for consistency)
-    const calculateEndDate = (start: string, days: number) => {
-        if (!start) return '';
-        const d = new Date(start);
-        d.setDate(d.getDate() + (days - 1));
-        return d.toISOString().split('T')[0];
-    };
-
-    const calculateDuration = (start: string, end: string) => {
-        if (!start || !end) return 1;
-        const s = new Date(start);
-        const e = new Date(end);
-        const diffTime = e.getTime() - s.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-        return diffDays > 0 ? diffDays : 1;
-    };
-
-    const handleStartDateChange = (date: string) => {
-        if (!date) return;
-        const endDateStr = calculateEndDate(date, duration);
-        setFormData(prev => ({ ...prev, startDate: date, endDate: endDateStr }));
-    };
-
-    const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const days = parseInt(e.target.value) || 1;
-        setDuration(days);
-        if (formData.startDate) {
-            const endDate = calculateEndDate(formData.startDate, days);
-            setFormData(prev => ({ ...prev, endDate }));
-        }
-    };
-
-    const handleEndDateChange = (date: string) => {
-        if (formData.startDate && date) {
-            const days = calculateDuration(formData.startDate, date);
-            setDuration(days);
-        }
-        setFormData(prev => ({ ...prev, endDate: date }));
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (trip.id && formData.title && formData.startDate && formData.endDate) {
-            await db.trips.update(trip.id, {
-                title: formData.title,
-                destination: formData.destination,
-                startDate: formData.startDate,
-                endDate: formData.endDate
-            });
-            onClose();
-        }
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl max-w-lg w-full flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-300 border-[8px] border-slate-100 dark:border-slate-800">
-                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                    <h3 className="text-xl font-black text-slate-800 dark:text-white uppercase">Edit Trip</h3>
-                    <button onClick={onClose}><X className="w-6 h-6 text-slate-400 hover:text-red-500" /></button>
-                </div>
-                <form onSubmit={handleSubmit} className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
-                    <Input 
-                        label="Trip Name" 
-                        value={formData.title} 
-                        onChange={e => setFormData({...formData, title: e.target.value})} 
-                        icon={Tag}
-                        iconColor="purple"
-                    />
-                     <Input 
-                        label="Destination" 
-                        value={formData.destination} 
-                        onChange={e => setFormData({...formData, destination: e.target.value})} 
-                        icon={Globe}
-                        iconColor="blue"
-                    />
-                    
-                    <div className="space-y-4">
-                        <DateInput 
-                            label="Start Date" 
-                            value={formData.startDate || ''} 
-                            onChange={handleStartDateChange} 
-                            icon={Calendar} 
-                            iconColor="green"
-                        />
-                        <div className="flex gap-4">
-                            <div className="flex-1">
-                                <Input 
-                                    label="Duration" 
-                                    type="number"
-                                    min={1}
-                                    value={duration}
-                                    onChange={handleDurationChange}
-                                    icon={Clock}
-                                    iconColor="orange"
-                                />
-                            </div>
-                            <div className="flex-1">
-                                <DateInput 
-                                    label="End Date" 
-                                    value={formData.endDate || ''} 
-                                    onChange={handleEndDateChange} 
-                                    icon={Calendar} 
-                                    iconColor="red"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <Button type="submit" size="xl" className="w-full mt-4">Save Changes</Button>
-                </form>
-            </div>
-        </div>
-    );
-}
-
 // --- Add Item Modal ---
-interface AddItemModalProps {
-    tripId: number;
-    isOpen: boolean;
-    onClose: () => void;
-    date?: string;
-    initialType?: ItemType;
-    minDate?: string; // Limit selection
-    maxDate?: string;
-}
-
-const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity', minDate, maxDate }: AddItemModalProps) => {
+const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity' }: { tripId: number, isOpen: boolean, onClose: () => void, date?: string, initialType?: ItemType }) => {
   const [formData, setFormData] = useState<Partial<TripItem>>({
     type: initialType,
     date: date || new Date().toISOString().split('T')[0],
@@ -190,9 +46,7 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity',
 
   useEffect(() => {
     if (isOpen) {
-        // Default to provided date, or minDate, or today
-        const d = date || minDate || new Date().toISOString().split('T')[0];
-        
+        const d = date || new Date().toISOString().split('T')[0];
         setFormData(prev => ({ 
           ...prev, 
           type: initialType,
@@ -206,7 +60,7 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity',
         }));
         setFlightSegments([]);
     }
-  }, [isOpen, date, initialType, minDate]);
+  }, [isOpen, date, initialType]);
 
   const handleStartDateChange = (val: string) => {
     // Automatically set end date to the same day when start date changes
@@ -467,8 +321,6 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity',
                         required
                         icon={Calendar}
                         iconColor="green"
-                        min={minDate}
-                        max={maxDate}
                     />
                     <TimeInput 
                         label="Dep. Time" 
@@ -501,8 +353,6 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity',
                         onChange={val => setFormData({...formData, endDate: val})} 
                         icon={Calendar}
                         iconColor="purple"
-                        min={minDate}
-                        max={maxDate}
                     />
                      <TimeInput 
                         label="Arr. Time" 
@@ -572,8 +422,6 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity',
                             required
                             icon={Calendar}
                             iconColor="blue"
-                            min={minDate}
-                            max={maxDate}
                         />
                          <TimeInput 
                             label="Pick-up Time"
@@ -608,8 +456,6 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity',
                             placeholder="Drop date"
                             icon={Calendar}
                             iconColor="orange"
-                            min={minDate}
-                            max={maxDate}
                         />
                          <TimeInput 
                             label="Drop-off Time"
@@ -666,8 +512,6 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity',
                             onChange={handleStartDateChange} 
                             required
                             icon={Calendar}
-                            min={minDate}
-                            max={maxDate}
                         />
                         <TimeInput 
                             value={formData.startTime || '15:00'}
@@ -682,8 +526,6 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity',
                             onChange={val => setFormData({...formData, endDate: val})} 
                             icon={Calendar}
                             iconColor="red"
-                            min={minDate}
-                            max={maxDate}
                         />
                         <TimeInput 
                             value={formData.endTime || '11:00'}
@@ -724,8 +566,6 @@ const AddItemModal = ({ tripId, isOpen, onClose, date, initialType = 'activity',
                         required
                         icon={Calendar}
                         iconColor="green"
-                        min={minDate}
-                        max={maxDate}
                     />
                     <TimeInput 
                         label="Time" 
@@ -961,7 +801,6 @@ export const TripDetailPage = () => {
   const items = useLiveQuery(() => db.items.where('tripId').equals(tripId).sortBy('date')); // Sort by date primarily
   const [activeTab, setActiveTab] = useState<'itinerary' | 'flight' | 'car' | 'stay' | 'activity' | 'map'>('itinerary');
   const [isModalOpen, setModalOpen] = useState(false);
-  const [isEditModalOpen, setEditModalOpen] = useState(false);
   const [selectedDateForAdd, setSelectedDateForAdd] = useState<string | undefined>(undefined);
   const [generating, setGenerating] = useState(false);
   
@@ -1103,7 +942,7 @@ export const TripDetailPage = () => {
   const filteredItems = activeTab === 'itinerary' ? items : items?.filter(i => i.type === activeTab);
 
   // Determine which type to default to when opening modal based on current tab
-  const modalDefaultType: ItemType = (activeTab !== 'itinerary' && activeTab !== 'map') ? activeTab : 'activity';
+  const modalDefaultType: ItemType = (activeTab !== 'itinerary' && activeTab !== 'note' && activeTab !== 'map') ? activeTab : 'activity';
 
   return (
     <Layout title={trip.title || trip.destination}>
@@ -1139,15 +978,10 @@ export const TripDetailPage = () => {
                     </div>
                 </div>
                 
-                <div className="flex gap-2">
-                    <Button onClick={() => setEditModalOpen(true)} className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-md border-white/40 shadow-xl flex" size="sm">
-                        <Edit className="w-4 h-4 mr-2" /> Edit
-                    </Button>
-                    {/* Share Button - Native Share or Download */}
-                    <Button onClick={handleShareTrip} className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-md border-white/40 shadow-xl flex" size="sm">
-                        <Share2 className="w-4 h-4 mr-2" /> Share
-                    </Button>
-                </div>
+                {/* Share Button - Native Share or Download */}
+                <Button onClick={handleShareTrip} className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-md border-white/40 shadow-xl flex" size="sm">
+                    <Share2 className="w-4 h-4 mr-2" /> Share Trip
+                </Button>
             </div>
           </div>
         </div>
@@ -1384,14 +1218,6 @@ export const TripDetailPage = () => {
         onClose={() => setModalOpen(false)} 
         date={selectedDateForAdd}
         initialType={modalDefaultType}
-        minDate={trip?.startDate}
-        maxDate={trip?.endDate}
-      />
-      
-      <EditTripModal 
-        trip={trip}
-        isOpen={isEditModalOpen}
-        onClose={() => setEditModalOpen(false)}
       />
     </Layout>
   );
