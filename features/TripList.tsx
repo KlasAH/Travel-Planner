@@ -270,26 +270,41 @@ export const TripListPage = () => {
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        const MAX_DIM = 2000; // Allow reasonable detail for maps
+        
+        // Auto-adjustment logic for App fit
+        const MAX_DIM = 1200; // Max dimension to keep DB light and performant
+        const MIN_DIM = 600;  // Min dimension to ensure visibility
+        
         let width = img.width;
         let height = img.height;
 
-        if (width > height) {
-            if (width > MAX_DIM) {
+        // Downscale if too big
+        if (width > MAX_DIM || height > MAX_DIM) {
+            if (width > height) {
                 height *= MAX_DIM / width;
                 width = MAX_DIM;
-            }
-        } else {
-            if (height > MAX_DIM) {
+            } else {
                 width *= MAX_DIM / height;
                 height = MAX_DIM;
             }
+        } 
+        // Upscale if too small (prevents tiny images)
+        else if (width < MIN_DIM && height < MIN_DIM) {
+             const scale = Math.max(MIN_DIM / width, MIN_DIM / height);
+             width *= scale;
+             height *= scale;
         }
 
         canvas.width = width;
         canvas.height = height;
-        ctx?.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        
+        if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, width, height);
+        }
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
         setNewTrip(prev => ({ ...prev, customMapImage: dataUrl }));
       };
       if (event.target?.result) {
@@ -525,7 +540,10 @@ export const TripListPage = () => {
 
                   {/* Map Upload Section */}
                   <div className="w-full">
-                    <label className="block text-xs font-black text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-widest pl-2">Custom Map (Optional)</label>
+                    {/* Updated Label Styles as requested */}
+                    <label className="block text-sm font-black text-slate-800 dark:text-slate-200 mb-2 uppercase tracking-widest pl-2">
+                        Custom Map (Optional)
+                    </label>
                     <div className="flex items-center gap-3">
                        <div className="w-[4.5rem] h-[4.5rem] shrink-0 flex items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-orange-500/50 border-b-[6px] border-orange-600 text-white">
                           <Map className="w-8 h-8 drop-shadow-md" strokeWidth={3} />
@@ -533,7 +551,7 @@ export const TripListPage = () => {
                        <div className="flex-1 relative h-[4.5rem]">
                           <div className="absolute inset-0 bg-slate-100 dark:bg-slate-800 rounded-2xl border-[3px] border-slate-300 dark:border-slate-700 shadow-inner flex items-center px-5 overflow-hidden">
                               <span className="text-slate-400 font-bold truncate">
-                                  {newTrip.customMapImage ? 'Map Uploaded!' : 'Tap to upload a map image...'}
+                                  {newTrip.customMapImage ? 'Map Uploaded & Adjusted!' : 'Tap to upload a map image...'}
                               </span>
                           </div>
                           <input 
@@ -544,8 +562,9 @@ export const TripListPage = () => {
                           />
                        </div>
                     </div>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 font-semibold mt-2 pl-2">
-                       Tip: Upload a map of your destination. Recommended size: 1080x1080px or square aspect ratio for best fit.
+                    {/* Updated Tip Text */}
+                    <p className="text-sm text-slate-700 dark:text-slate-300 font-bold mt-2 pl-2">
+                       We'll auto-adjust your map image to fit perfectly.
                     </p>
                     {newTrip.customMapImage && (
                         <div className="mt-3 ml-[5.25rem]">
