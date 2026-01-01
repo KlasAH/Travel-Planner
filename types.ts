@@ -9,6 +9,7 @@ export interface Trip {
   tags?: string[]; // Interests connected words
   notes?: string; // Legacy notes or extra details
   coverImage?: string;
+  customMapImage?: string; // User uploaded map
 }
 
 export type ItemType = 'flight' | 'car' | 'stay' | 'activity' | 'note';
