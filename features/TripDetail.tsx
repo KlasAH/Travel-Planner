@@ -6,7 +6,6 @@ import { db } from '../db';
 import { Trip, TripItem, ItemType, SharedTripData } from '../types';
 import { Layout, Button, Card, CategoryIcon, Input, Fab, DateInput, TimeInput } from '../components/Shared';
 import { Plus, Trash2, Calendar, MapPin, Clock, DollarSign, Check, Wand2, Tag, AlignLeft, Hash, Plane, Key, Home, Car, X, Link as LinkIcon, ExternalLink, ArrowRight, Globe, ChevronRight, Share2, Copy, ImageIcon, AlertTriangle, Upload, Map } from 'lucide-react';
-import { generateItinerary, Suggestion } from '../services/geminiService';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import { feature } from 'topojson-client';
 import { geoBounds, geoCentroid } from 'd3-geo';
@@ -109,15 +108,15 @@ const CountryFocusMap = ({ countryName }: { countryName: string }) => {
   }, [countryName]);
 
   return (
-    <div className="w-full h-full bg-sky-100 dark:bg-slate-800 relative overflow-hidden rounded-[2.5rem] transition-colors duration-500">
-        {/* Decorative Grid - Blue in light mode, Dark in dark mode */}
+    <div className="w-full h-full bg-emerald-100 dark:bg-slate-800 relative overflow-hidden rounded-[2.5rem] transition-colors duration-500">
+        {/* Decorative Grid - Green in light mode, Dark in dark mode */}
         <div className="absolute inset-0 pointer-events-none" style={{ 
             backgroundImage: 'radial-gradient(var(--grid-color) 1px, transparent 1px)', 
             backgroundSize: '24px 24px',
         }}></div>
         {/* CSS Var hack for dynamic grid color in style prop */}
         <style>{`
-          .bg-sky-100 { --grid-color: rgba(14, 165, 233, 0.3); } 
+          .bg-emerald-100 { --grid-color: rgba(16, 185, 129, 0.3); } 
           .dark .bg-slate-800 { --grid-color: rgba(148, 163, 184, 0.15); }
         `}</style>
         
@@ -941,7 +940,6 @@ export const TripDetailPage = () => {
   const [activeTab, setActiveTab] = useState<'itinerary' | 'flight' | 'car' | 'stay' | 'activity'>('itinerary');
   const [isModalOpen, setModalOpen] = useState(false);
   const [selectedDateForAdd, setSelectedDateForAdd] = useState<string | undefined>(undefined);
-  const [generating, setGenerating] = useState(false);
   const [isMapModalOpen, setMapModalOpen] = useState(false);
   
   // --- Notification Logic ---
@@ -1027,46 +1025,6 @@ export const TripDetailPage = () => {
     }
   };
 
-  const handleGenerateAI = async () => {
-    if (!trip) return;
-    setGenerating(true);
-    try {
-      // Use tags or legacy notes
-      const interests = (trip.tags?.join(', ') || trip.notes) || 'General sightseeing';
-      const suggestions = await generateItinerary(trip.destination, days.length, interests);
-      
-      // Bulk add suggestions
-      await (db as any).transaction('rw', db.items, async () => {
-        for (const dayData of suggestions) {
-          const dateStr = days[dayData.day - 1];
-          if (!dateStr) continue;
-          
-          const seed = `${dayData.activities[0].title} ${dayData.activities[0].location} activity`;
-          const imageUrl = `https://picsum.photos/seed/${encodeURIComponent(seed)}/300/300`;
-
-          for (const act of dayData.activities) {
-            await db.items.add({
-              tripId,
-              type: 'activity',
-              title: act.title,
-              details: act.description,
-              location: act.location,
-              cost: act.estimatedCost,
-              date: dateStr,
-              startTime: act.timeOfDay === 'Morning' ? '09:00' : act.timeOfDay === 'Afternoon' ? '14:00' : '19:00',
-              completed: false,
-              imageUrl: imageUrl
-            });
-          }
-        }
-      });
-    } catch (e) {
-      alert("Could not generate itinerary. Check API Key or try again.");
-    } finally {
-      setGenerating(false);
-    }
-  };
-
   if (!trip) return <div className="p-12 text-center text-slate-500 dark:text-slate-400 font-bold text-xl">Loading trip...</div>;
 
   const filteredItems = activeTab === 'itinerary' ? items : items?.filter(i => i.type === activeTab);
@@ -1118,16 +1076,6 @@ export const TripDetailPage = () => {
             </div>
           </div>
         </div>
-        
-        {/* Magic Plan Button */}
-        {(!items || items.length === 0) && (
-           <div className="absolute top-6 right-6 z-10 pointer-events-auto">
-             <Button onClick={handleGenerateAI} disabled={generating} className="bg-white/90 text-brand-800 hover:bg-white border-0 shadow-xl backdrop-blur-md">
-               <Wand2 className={`w-5 h-5 mr-2 ${generating ? 'animate-spin' : ''}`} />
-               {generating ? 'Planning...' : 'Auto-Plan with AI'}
-             </Button>
-           </div>
-        )}
       </div>
 
       {/* Navigation Tabs */}
