@@ -109,9 +109,20 @@ const CountryFocusMap = ({ countryName }: { countryName: string }) => {
   }, [countryName]);
 
   return (
-    <div className="w-full h-full bg-slate-900 relative overflow-hidden rounded-[2.5rem]">
-        {/* Decorative Grid */}
-        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'linear-gradient(#334155 1px, transparent 1px), linear-gradient(90deg, #334155 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
+    <div className="w-full h-full bg-sky-100 dark:bg-slate-800 relative overflow-hidden rounded-[2.5rem] transition-colors duration-500">
+        {/* Decorative Grid - Blue in light mode, Dark in dark mode */}
+        <div className="absolute inset-0 pointer-events-none" style={{ 
+            backgroundImage: 'radial-gradient(var(--grid-color) 1px, transparent 1px)', 
+            backgroundSize: '24px 24px',
+        }}></div>
+        {/* CSS Var hack for dynamic grid color in style prop */}
+        <style>{`
+          .bg-sky-100 { --grid-color: rgba(14, 165, 233, 0.3); } 
+          .dark .bg-slate-800 { --grid-color: rgba(148, 163, 184, 0.15); }
+        `}</style>
+        
+        {/* Vignette / Spotlight for Dark Mode to make it pop */}
+        <div className="absolute inset-0 pointer-events-none opacity-0 dark:opacity-100 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-700/50 to-slate-900/80 transition-opacity duration-500"></div>
         
         <ComposableMap projection="geoMercator" projectionConfig={{ scale: 100 }} style={{ width: "100%", height: "100%" }}>
             <ZoomableGroup center={mapConfig.center} zoom={mapConfig.zoom} minZoom={1} maxZoom={100}>
@@ -132,7 +143,7 @@ const CountryFocusMap = ({ countryName }: { countryName: string }) => {
                             stroke="#ffffff"
                             strokeWidth={0.5}
                             style={{
-                                default: { outline: "none", filter: "drop-shadow(0 10px 20px rgba(0,0,0,0.5))" },
+                                default: { outline: "none", filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.2))" },
                                 hover: { outline: "none" },
                                 pressed: { outline: "none" },
                             }}
@@ -145,7 +156,7 @@ const CountryFocusMap = ({ countryName }: { countryName: string }) => {
         </ComposableMap>
         
         {/* Overlay Label */}
-        <div className="absolute bottom-6 right-8 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10">
+        <div className="absolute bottom-6 right-8 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 shadow-xl">
             <span className="text-white font-mono text-xs uppercase tracking-widest">
                 MAP_VIEW: {countryName.toUpperCase().slice(0, 12)}...
             </span>
