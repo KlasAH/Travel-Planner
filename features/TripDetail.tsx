@@ -5,7 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { Trip, TripItem, ItemType, SharedTripData } from '../types';
 import { Layout, Button, Card, CategoryIcon, Input, Fab, DateInput, TimeInput } from '../components/Shared';
-import { Plus, Trash2, Calendar, MapPin, Clock, DollarSign, Check, Wand2, Tag, AlignLeft, Hash, Plane, Key, Home, Car, X, Link as LinkIcon, ExternalLink, ArrowRight, Globe, ChevronRight, Share2, Copy, ImageIcon, AlertTriangle, Upload, Map } from 'lucide-react';
+import { Plus, Trash2, Calendar, MapPin, Clock, DollarSign, Check, Tag, AlignLeft, Hash, Plane, Key, Home, Car, X, Link as LinkIcon, ExternalLink, ArrowRight, Globe, ChevronRight, Share2, Copy, ImageIcon, AlertTriangle, Upload, Map } from 'lucide-react';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import { feature } from 'topojson-client';
 import { geoBounds, geoCentroid } from 'd3-geo';
@@ -108,7 +108,7 @@ const CountryFocusMap = ({ countryName }: { countryName: string }) => {
   }, [countryName]);
 
   return (
-    <div className="w-full h-full bg-emerald-100 dark:bg-slate-800 relative overflow-hidden rounded-[2.5rem] transition-colors duration-500">
+    <div className="w-full h-full bg-green-100 dark:bg-slate-800 relative overflow-hidden rounded-[2.5rem] transition-colors duration-500">
         {/* Decorative Grid - Green in light mode, Dark in dark mode */}
         <div className="absolute inset-0 pointer-events-none" style={{ 
             backgroundImage: 'radial-gradient(var(--grid-color) 1px, transparent 1px)', 
@@ -116,7 +116,7 @@ const CountryFocusMap = ({ countryName }: { countryName: string }) => {
         }}></div>
         {/* CSS Var hack for dynamic grid color in style prop */}
         <style>{`
-          .bg-emerald-100 { --grid-color: rgba(16, 185, 129, 0.3); } 
+          .bg-green-100 { --grid-color: rgba(22, 163, 74, 0.2); } 
           .dark .bg-slate-800 { --grid-color: rgba(148, 163, 184, 0.15); }
         `}</style>
         
