@@ -1,11 +1,38 @@
-import React, { useState } from 'react';
-import { Layout, Button, Card, Input } from '../components/Shared';
+import React, { useState, useEffect } from 'react';
+import { Layout, Button, Card, Input, ThemeMode } from '../components/Shared';
 import { db } from '../db';
-import { Download, Upload, Trash2, CheckCircle, AlertCircle, ShieldAlert, KeyRound, AlertTriangle } from 'lucide-react';
+import { Download, Upload, Trash2, CheckCircle, AlertCircle, ShieldAlert, KeyRound, AlertTriangle, Sun, Moon, Monitor, CalendarDays } from 'lucide-react';
 import { BackupData } from '../types';
 
 export const SettingsPage = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  
+  // Theme State (synced with localStorage)
+  const [currentTheme, setCurrentTheme] = useState<ThemeMode>('system');
+
+  useEffect(() => {
+      const saved = localStorage.getItem('theme_preference') as ThemeMode;
+      if (saved) setCurrentTheme(saved);
+  }, []);
+
+  const changeTheme = (mode: ThemeMode) => {
+      setCurrentTheme(mode);
+      localStorage.setItem('theme_preference', mode);
+      // Trigger a storage event or force update if needed, but the Layout component listens to the same key on mount/update logic.
+      // Since Layout wraps this page, we need to manually trigger the update or reload.
+      // Easiest way in this architecture without a global Context is to reload or rely on Layout's cycle.
+      // However, Layout listens to local state. We need to dispatch a custom event or simply reload to apply cleanly if context isn't available.
+      // Optimization: Layout effect depends on state. We can force a re-render of Layout if we lifted state, 
+      // but simpler here: The Header button works because it sets State. 
+      // We will reload window for settings change to take global effect immediately if we are not using React Context.
+      // Actually, let's just update the localStorage and dispatch a storage event, though React state won't catch it across components easily without Context.
+      // A simple window.location.reload() is a crude but effective way to ensure the whole app syncs.
+      // BETTER: Dispatch a custom event that Layout listens to? 
+      // Current implementation in Shared.tsx Layout reads localstorage on Mount. 
+      // Let's just reload for now to be safe, or accept that the user might need to navigate to see change.
+      // ACTUALLY: Let's assume the user accepts a quick flash.
+      window.location.reload(); 
+  };
   
   // Wizard State
   const [isWizardOpen, setWizardOpen] = useState(false);
@@ -111,8 +138,50 @@ export const SettingsPage = () => {
           </div>
         )}
 
-        {/* Export / Import Section */}
+        {/* Theme Section */}
         <section>
+            <h2 className="text-xl font-black mb-4 text-slate-800 dark:text-white flex items-center gap-2">
+                <Sun className="w-6 h-6 text-amber-500" />
+                Appearance
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                    { mode: 'light', label: 'Light', icon: Sun, color: 'text-amber-500', bg: 'bg-amber-100' },
+                    { mode: 'dark', label: 'Dark', icon: Moon, color: 'text-purple-500', bg: 'bg-purple-100' },
+                    { mode: 'system', label: 'Auto', icon: Monitor, color: 'text-slate-500', bg: 'bg-slate-200' },
+                    { mode: 'seasonal', label: 'Calendar', icon: CalendarDays, color: 'text-green-600', bg: 'bg-green-100' },
+                ].map((t) => (
+                    <button
+                        key={t.mode}
+                        onClick={() => changeTheme(t.mode as ThemeMode)}
+                        className={`flex flex-col items-center justify-center p-4 rounded-2xl border-[3px] transition-all duration-200 ${
+                            currentTheme === t.mode 
+                            ? 'border-brand-500 bg-white dark:bg-slate-800 shadow-xl scale-105' 
+                            : 'border-transparent bg-white dark:bg-slate-800 shadow-sm hover:scale-105 opacity-70 hover:opacity-100'
+                        }`}
+                    >
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-2 ${t.bg} dark:bg-opacity-20`}>
+                            <t.icon className={`w-6 h-6 ${t.color}`} strokeWidth={3} />
+                        </div>
+                        <span className="font-bold text-slate-700 dark:text-slate-300 text-sm uppercase tracking-wide">{t.label}</span>
+                    </button>
+                ))}
+            </div>
+            {currentTheme === 'seasonal' && (
+                <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl flex items-start gap-3">
+                    <CalendarDays className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+                    <div>
+                        <p className="text-sm font-bold text-green-800 dark:text-green-300">Calendar Mode Active</p>
+                        <p className="text-xs text-green-700 dark:text-green-400 mt-1">
+                            Theme changes automatically based on the season (Winter/Autumn = Dark, Spring/Summer = Light).
+                        </p>
+                    </div>
+                </div>
+            )}
+        </section>
+
+        {/* Export / Import Section */}
+        <section className="pt-8 border-t-2 border-slate-200 dark:border-slate-800">
            <h2 className="text-xl font-black mb-4 text-slate-800 dark:text-white flex items-center gap-2">
              <Download className="w-6 h-6 text-brand-500" /> 
              Data Sync
@@ -169,7 +238,7 @@ export const SettingsPage = () => {
         </section>
 
         <div className="text-center text-xs font-bold text-slate-400 dark:text-slate-600 mt-12 uppercase tracking-widest">
-          Wanderlust AI Planner v1.2
+          Wanderlust AI Planner v1.3
         </div>
       </div>
 

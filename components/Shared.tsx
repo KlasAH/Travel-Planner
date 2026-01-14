@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useImperativeHandle } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Settings, Map, Calendar as CalendarIcon, Plane, Car, Hotel, Activity, Home, Sun, Moon, Plus, Check, Trash2, Clock, DollarSign, MapPin, ChevronDown, X, ChevronLeft } from 'lucide-react';
+import { ArrowLeft, Settings, Map, Calendar as CalendarIcon, Plane, Car, Hotel, Activity, Home, Sun, Moon, Plus, Check, Trash2, Clock, DollarSign, MapPin, ChevronDown, X, ChevronLeft, Monitor, CalendarDays } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 
 // --- UI Primitives ---
@@ -447,6 +447,8 @@ export const CategoryIcon = ({ type, className }: { type: string, className?: st
 
 // --- Layout ---
 
+export type ThemeMode = 'light' | 'dark' | 'system' | 'seasonal';
+
 interface LayoutProps {
   children?: React.ReactNode;
   title?: string;
@@ -457,25 +459,91 @@ export const Layout: React.FC<LayoutProps> = ({ children, title }) => {
   const location = useLocation();
   const isHome = location.pathname === '/';
   
-  const [isDark, setIsDark] = useState(() => {
+  // Theme State
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('theme') === 'dark' || 
-        (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      return (localStorage.getItem('theme_preference') as ThemeMode) || 'system';
     }
-    return false;
+    return 'system';
   });
 
+  // Apply Theme Effect
   useEffect(() => {
+    const root = document.documentElement;
+    let isDark = false;
+
+    if (themeMode === 'dark') {
+      isDark = true;
+    } else if (themeMode === 'light') {
+      isDark = false;
+    } else if (themeMode === 'system') {
+      isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } else if (themeMode === 'seasonal') {
+      // Calendar Based Logic (Swedish/European Seasons)
+      // Winter (Dec, Jan, Feb) -> Dark
+      // Spring (Mar, Apr, May) -> Light
+      // Summer (Jun, Jul, Aug) -> Light
+      // Autumn (Sep, Oct, Nov) -> Dark
+      const month = new Date().getMonth(); // 0-11
+      const winterMonths = [11, 0, 1]; // Dec, Jan, Feb
+      const autumnMonths = [8, 9, 10]; // Sep, Oct, Nov
+      
+      // We set Dark for Winter and Autumn evenings (Generalizing 'Cozy' as Dark for now)
+      // Or strictly Winter = Dark. Let's do Winter + Autumn = Dark for cozy vibes.
+      isDark = [...winterMonths, ...autumnMonths].includes(month);
+    }
+
     if (isDark) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
+      root.classList.add('dark');
+      // Store 'theme' key for legacy/simple checks if needed, but 'theme_preference' is source of truth
+      localStorage.setItem('theme', 'dark'); 
     } else {
-      document.documentElement.classList.remove('dark');
+      root.classList.remove('dark');
       localStorage.setItem('theme', 'light');
     }
-  }, [isDark]);
 
-  const toggleTheme = () => setIsDark(!isDark);
+    // Save preference
+    localStorage.setItem('theme_preference', themeMode);
+
+    // Listen for system changes if in system mode
+    if (themeMode === 'system') {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handler = (e: MediaQueryListEvent) => {
+             if (e.matches) root.classList.add('dark');
+             else root.classList.remove('dark');
+        };
+        mediaQuery.addEventListener('change', handler);
+        return () => mediaQuery.removeEventListener('change', handler);
+    }
+  }, [themeMode]);
+
+  // Cycle Theme: Light -> Dark -> System -> Seasonal
+  const cycleTheme = () => {
+    const modes: ThemeMode[] = ['light', 'dark', 'system', 'seasonal'];
+    const currentIndex = modes.indexOf(themeMode);
+    const nextMode = modes[(currentIndex + 1) % modes.length];
+    setThemeMode(nextMode);
+  };
+
+  const getThemeIcon = () => {
+    switch(themeMode) {
+      case 'light': return Sun;
+      case 'dark': return Moon;
+      case 'system': return Monitor;
+      case 'seasonal': return CalendarDays;
+      default: return Sun;
+    }
+  };
+
+  const getThemeLabel = () => {
+     switch(themeMode) {
+      case 'light': return 'Light';
+      case 'dark': return 'Dark';
+      case 'system': return 'Auto';
+      case 'seasonal': return 'Season';
+      default: return 'Theme';
+    }
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-slate-950 transition-colors duration-300 pb-10 font-sans">
@@ -499,7 +567,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title }) => {
               <NavButton icon={ArrowLeft} onClick={() => navigate(-1)} label="Back" color="rose" />
             )}
             <NavButton icon={Home} onClick={() => navigate('/')} label="Home" color="cyan" />
-            <NavButton icon={isDark ? Sun : Moon} onClick={toggleTheme} label="Theme" color="amber" />
+            <NavButton icon={getThemeIcon()} onClick={cycleTheme} label={getThemeLabel()} color="amber" />
             <NavButton icon={Settings} onClick={() => navigate('/settings')} label="Settings" color="slate" />
           </div>
         </div>
